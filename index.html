@@ -952,39 +952,316 @@ document.addEventListener("keydown", event => {
   }
 });
 
-function sprocketRadius(teeth) {
-  return teeth / (4 * Math.PI);
+/*
+ * Bicycle chain geometry
+ *
+ * A bicycle chain has a 1/2-inch pitch. Rather than treating the
+ * chainring and rear cog as smooth pulleys, model the roller centres
+ * as the vertices of regular polygons.
+ *
+ * Adjacent vertices are therefore exactly one chain pitch apart.
+ */
+const CHAIN_PITCH_IN = 0.5;
+
+/*
+ * Number of positions sampled during one tooth-engagement cycle.
+ *
+ * 32 is already plenty for bicycle-sized sprockets. Increase to 64
+ * if desired; it costs additional CPU time.
+ */
+const CHAIN_PHASE_SAMPLES = 32;
+
+const GEOMETRY_EPSILON = 1e-12;
+
+
+/*
+ * Exact pitch radius of a sprocket.
+ *
+ * The chord between adjacent roller centres is one chain pitch:
+ *
+ *     pitch = 2 R sin(pi / teeth)
+ *
+ * therefore:
+ *
+ *     R = pitch / (2 sin(pi / teeth))
+ */
+function sprocketPitchRadius(teeth) {
+  return CHAIN_PITCH_IN /
+    (2 * Math.sin(Math.PI / teeth));
 }
 
-function chainPath(chainring, cog, chainstay) {
-  const ringRadius = sprocketRadius(chainring);
-  const cogRadius = sprocketRadius(cog);
-  const difference = ringRadius - cogRadius;
 
-  if (Math.abs(difference) >= chainstay) return NaN;
+/*
+ * Build the pitch polygon for one sprocket.
+ *
+ * Each point represents the centre of a chain roller sitting in a
+ * tooth position.
+ */
+function buildPitchPolygon(
+  teeth,
+  centerX,
+  phase,
+  owner
+) {
+  const radius =
+    sprocketPitchRadius(teeth);
 
-  const thetaDegrees = Math.acos(difference / chainstay) * 180 / Math.PI;
+  const points = [];
 
+  for (let tooth = 0; tooth < teeth; tooth++) {
+    const angle =
+      phase +
+      tooth * 2 * Math.PI / teeth;
+
+    points.push({
+      x: centerX + radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+      owner,
+      tooth
+    });
+  }
+
+  return points;
+}
+
+
+/*
+ * 2-D cross product used by the convex-hull solver.
+ */
+function geometryCross(origin, a, b) {
   return (
-    (180 - thetaDegrees) * Math.PI * ringRadius +
-    thetaDegrees * Math.PI * cogRadius +
-    180 * Math.sqrt(chainstay ** 2 - difference ** 2)
-  ) / 90;
+    (a.x - origin.x) * (b.y - origin.y) -
+    (a.y - origin.y) * (b.x - origin.x)
+  );
 }
 
-function solveChainstay(chainring, cog, chainLength, approximateChainstay) {
-  let low = Math.max(2, approximateChainstay - 5);
-  let high = approximateChainstay + 5;
 
-  for (let i = 0; i < 90; i++) {
-    const midpoint = (low + high) / 2;
-    const path = chainPath(chainring, cog, midpoint);
-    if (!Number.isFinite(path) || path < chainLength) low = midpoint;
-    else high = midpoint;
+/*
+ * Andrew's monotonic-chain convex hull.
+ *
+ * The taut chain envelope around the two sprocket pitch polygons is
+ * the convex hull of their roller-centre points.
+ */
+function convexHull(points) {
+  if (points.length <= 1) {
+    return [...points];
+  }
+
+  const sorted =
+    [...points].sort((a, b) =>
+      a.x === b.x
+        ? a.y - b.y
+        : a.x - b.x
+    );
+
+  const lower = [];
+
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      geometryCross(
+        lower[lower.length - 2],
+        lower[lower.length - 1],
+        point
+      ) <= GEOMETRY_EPSILON
+    ) {
+      lower.pop();
+    }
+
+    lower.push(point);
+  }
+
+  const upper = [];
+
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const point = sorted[i];
+
+    while (
+      upper.length >= 2 &&
+      geometryCross(
+        upper[upper.length - 2],
+        upper[upper.length - 1],
+        point
+      ) <= GEOMETRY_EPSILON
+    ) {
+      upper.pop();
+    }
+
+    upper.push(point);
+  }
+
+  /*
+   * Last point of each list is the first point of the other list.
+   */
+  lower.pop();
+  upper.pop();
+
+  return lower.concat(upper);
+}
+
+
+function pointDistance(a, b) {
+  return Math.hypot(
+    b.x - a.x,
+    b.y - a.y
+  );
+}
+
+
+/*
+ * Calculate the length of the taut polygonal chain envelope for one
+ * rotational phase of the drivetrain.
+ */
+function polygonChainPathForPhase(
+  chainring,
+  cog,
+  chainstay,
+  phaseFraction
+) {
+  if (chainstay <= 0) {
+    return NaN;
+  }
+
+  /*
+   * phaseFraction represents movement through one chain pitch.
+   *
+   * A one-pitch movement rotates each sprocket by one tooth.
+   */
+  const ringPhase =
+    phaseFraction *
+    2 * Math.PI / chainring;
+
+  const cogPhase =
+    phaseFraction *
+    2 * Math.PI / cog;
+
+  const ringPoints =
+    buildPitchPolygon(
+      chainring,
+      0,
+      ringPhase,
+      "ring"
+    );
+
+  const cogPoints =
+    buildPitchPolygon(
+      cog,
+      chainstay,
+      cogPhase,
+      "cog"
+    );
+
+  const hull =
+    convexHull([
+      ...ringPoints,
+      ...cogPoints
+    ]);
+
+  if (hull.length < 3) {
+    return NaN;
+  }
+
+  let pathLength = 0;
+
+  for (let i = 0; i < hull.length; i++) {
+    const current = hull[i];
+    const next =
+      hull[(i + 1) % hull.length];
+
+    pathLength +=
+      pointDistance(current, next);
+  }
+
+  return pathLength;
+}
+
+
+/*
+ * Return the tightest chain-envelope length encountered as the
+ * drivetrain moves through one tooth-engagement cycle.
+ *
+ * Using the maximum matters: setting the chainstay from an easier
+ * phase could cause the chain to bind when the sprockets rotate into
+ * their tightest polygonal phase.
+ */
+function chainPath(
+  chainring,
+  cog,
+  chainstay
+) {
+  let maximumPath = -Infinity;
+
+  for (
+    let sample = 0;
+    sample < CHAIN_PHASE_SAMPLES;
+    sample++
+  ) {
+    const phaseFraction =
+      sample / CHAIN_PHASE_SAMPLES;
+
+    const path =
+      polygonChainPathForPhase(
+        chainring,
+        cog,
+        chainstay,
+        phaseFraction
+      );
+
+    if (Number.isFinite(path)) {
+      maximumPath =
+        Math.max(maximumPath, path);
+    }
+  }
+
+  return Number.isFinite(maximumPath)
+    ? maximumPath
+    : NaN;
+}
+
+
+/*
+ * Find the centre distance where the selected chain length becomes
+ * taut at the tightest polygonal phase.
+ */
+function solveChainstay(
+  chainring,
+  cog,
+  chainLength,
+  approximateChainstay
+) {
+  let low =
+    Math.max(
+      2,
+      approximateChainstay - 5
+    );
+
+  let high =
+    approximateChainstay + 5;
+
+  for (let i = 0; i < 70; i++) {
+    const midpoint =
+      (low + high) / 2;
+
+    const path =
+      chainPath(
+        chainring,
+        cog,
+        midpoint
+      );
+
+    if (
+      !Number.isFinite(path) ||
+      path < chainLength
+    ) {
+      low = midpoint;
+    } else {
+      high = midpoint;
+    }
   }
 
   return (low + high) / 2;
 }
+
 
 function calculateCombinations() {
   const selectedRings = getSelectedRings();
