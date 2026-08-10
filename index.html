@@ -84,6 +84,29 @@
       color:var(--muted);
       font-size:.82rem;
     }
+    .site-footer{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:18px;
+      padding:10px 4px 0;
+      color:var(--muted);
+      font-size:.8rem;
+      text-align:center;
+    }
+    .site-footer a{
+      color:var(--accent);
+      text-decoration:none;
+      font-weight:600;
+    }
+    .site-footer a:hover{
+      text-decoration:underline;
+    }
+    .site-footer-separator{
+      color:var(--border);
+    }
     @media(max-width:640px){
       .unit-controls{
         width:100%;
@@ -644,6 +667,18 @@
       <span class="report-icon" aria-hidden="true">PDF</span>
       Generate PDF report
     </button>
+  </footer>
+
+  <footer class="site-footer">
+    <span>CogSmith is open source.</span>
+    <a href="https://github.com/KingBain/CogSmith"
+       target="_blank"
+       rel="noopener noreferrer">View the project on GitHub</a>
+    <span class="site-footer-separator">•</span>
+    <span>Found a bug or have an idea?</span>
+    <a href="https://github.com/KingBain/CogSmith/issues/new"
+       target="_blank"
+       rel="noopener noreferrer">Open an issue</a>
   </footer>
 </main>
 
