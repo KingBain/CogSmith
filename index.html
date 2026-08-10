@@ -1,0 +1,2799 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CogSmith — Single-Speed Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@4.0.0/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      color-scheme:light dark;
+      --bg:#f6f7fb; --panel:#fff; --text:#172033; --muted:#667085; --border:#d9dee8;
+      --accent:#7c3aed; --accentSoft:#eee8ff; --good:#138a53; --goodSoft:#e2f7ec;
+      --halfLink:#9a6a00; --halfLinkSoft:#f5ebc8;
+      --point:#687386; --shadow:0 12px 30px rgba(0,0,0,.08);
+    }
+    @media(prefers-color-scheme:dark){
+      :root{
+        --bg:#111318; --panel:#1a1e27; --text:#f2f4f7; --muted:#a5adba; --border:#343a47;
+        --accent:#b294ff; --accentSoft:#352d4c; --good:#5dd39e; --goodSoft:#183b2c;
+        --halfLink:#c99a28; --halfLinkSoft:#3a3018;
+        --point:#98a2b3; --shadow:0 12px 30px rgba(0,0,0,.25);
+      }
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:1220px;margin:auto;padding:30px 20px 56px}
+    h1{margin:0;font-size:2.15rem;letter-spacing:-.03em}
+    h2{margin:0 0 14px;font-size:1.15rem}
+    .subtitle{margin-top:6px;color:var(--muted)}
+    .site-header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      flex-wrap:wrap;
+    }
+    .report-button{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 14px;
+      border:1px solid var(--accent);
+      border-radius:10px;
+      background:var(--accent);
+      color:#fff;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .report-button:hover{filter:brightness(1.06)}
+    .report-button:disabled{
+      opacity:.6;
+      cursor:wait;
+      filter:none;
+    }
+    .report-icon{
+      font-size:1rem;
+      line-height:1;
+    }
+    .report-footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-top:26px;
+      padding:18px 20px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel);
+    }
+    .report-footer-copy{
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      min-width:0;
+    }
+    .report-footer-copy strong{
+      color:var(--text);
+      font-size:.95rem;
+    }
+    .report-footer-copy span{
+      color:var(--muted);
+      font-size:.82rem;
+    }
+    @media(max-width:640px){
+      .unit-controls{
+        width:100%;
+        justify-content:space-between;
+      }
+      .unit-copy{
+        text-align:left;
+        flex:1 1 180px;
+      }
+      .report-footer{
+        align-items:stretch;
+      }
+      .report-footer .report-button{
+        width:100%;
+        justify-content:center;
+      }
+    }
+    .panel{margin-top:22px;padding:20px;background:var(--panel);border:1px solid var(--border);border-radius:16px}
+    .unit-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+      padding-bottom:16px;
+      border-bottom:1px solid var(--border)
+    }
+    .unit-controls{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-left:auto;
+    }
+    .unit-copy{
+      margin:0;
+      color:var(--muted);
+      font-size:.8rem;
+      text-align:right;
+    }
+    .unit-toggle{
+      display:inline-flex;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--bg)
+    }
+    .unit-toggle button{
+      border:0;border-radius:7px;padding:8px 14px;background:transparent;color:var(--muted);cursor:pointer
+    }
+    .unit-toggle button[aria-pressed="true"]{
+      background:var(--accent);color:#fff;font-weight:700
+    }
+    .inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+    label,.field-label{display:flex;flex-direction:column;gap:6px;font-size:.88rem;color:var(--muted)}
+    .label-with-help{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      min-width:0;
+    }
+    .help-icon{
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+      width:17px;
+      height:17px;
+      border:1px solid var(--border);
+      border-radius:50%;
+      color:var(--muted);
+      font-size:.72rem;
+      font-weight:700;
+      line-height:1;
+      cursor:help;
+      user-select:none;
+    }
+    .help-icon:hover,
+    .help-icon:focus{
+      color:var(--text);
+      border-color:var(--accent);
+      outline:none;
+    }
+    .help-icon::after{
+      content:attr(data-tooltip);
+      position:absolute;
+      z-index:200;
+      left:50%;
+      bottom:calc(100% + 9px);
+      transform:translateX(-50%);
+      width:max-content;
+      max-width:280px;
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--panel);
+      color:var(--text);
+      box-shadow:var(--shadow);
+      font-size:.78rem;
+      font-weight:400;
+      line-height:1.35;
+      white-space:normal;
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+    .help-icon::before{
+      content:"";
+      position:absolute;
+      z-index:201;
+      left:50%;
+      bottom:calc(100% + 4px);
+      transform:translateX(-50%);
+      border:5px solid transparent;
+      border-top-color:var(--border);
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+    .help-icon:hover::after,
+    .help-icon:hover::before,
+    .help-icon:focus::after,
+    .help-icon:focus::before{
+      opacity:1;
+      visibility:visible;
+    }
+    input,summary,button{font:inherit}
+    input[type=number]{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;
+      background:var(--panel);color:var(--text)
+    }
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:22px}
+    .stat{padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:14px}
+    .stat-label{font-size:.8rem;color:var(--muted)}
+    .stat-value{margin-top:4px;font-size:1.5rem;font-weight:700}
+    .stat-detail{margin-top:3px;font-size:.82rem;color:var(--muted)}
+
+    /* multi-select */
+    .multi{position:relative}
+    details{position:relative}
+    summary{
+      position:relative;
+      min-height:42px;
+      padding:10px 40px 10px 12px;
+      border:1px solid var(--border);
+      border-radius:9px;
+      background:var(--panel);
+      color:var(--text);
+      cursor:pointer;
+      list-style:none;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis
+    }
+    summary::-webkit-details-marker{display:none}
+    summary::after{
+      content:"▾";
+      position:absolute;
+      right:13px;
+      top:50%;
+      transform:translateY(-50%);
+      color:var(--muted);
+      font-size:1rem;
+      line-height:1;
+    }
+    details[open] summary{border-color:var(--accent)}
+    details[open] summary::after{
+      content:"▴";
+      color:var(--accent);
+    }
+    .menu{
+      position:absolute;z-index:20;top:calc(100% + 7px);left:0;width:340px;max-width:min(340px,90vw);
+      padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)
+    }
+    .menu-header{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)
+    }
+    .menu-header strong{display:block;color:var(--text);font-size:.95rem}
+    .menu-subtitle{margin-top:2px;color:var(--muted);font-size:.76rem;line-height:1.35}
+    .icon-button{
+      flex:0 0 auto;width:34px;height:34px;padding:0;border:1px solid var(--border);border-radius:8px;
+      background:var(--panel);color:var(--text);font-size:1.35rem;line-height:1;cursor:pointer
+    }
+    .icon-button:hover{border-color:var(--accent);background:var(--accentSoft)}
+    .menu-actions{display:flex;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)}
+    .menu-actions button{
+      flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);cursor:pointer
+    }
+    .menu-actions button:hover{border-color:var(--accent)}
+    .cog-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-height:360px;overflow:auto}
+    .menu-footer{
+      position:sticky;bottom:-12px;margin:10px -12px -12px;padding:10px 12px 12px;
+      border-top:1px solid var(--border);background:var(--panel)
+    }
+    .done-button{
+      width:100%;padding:10px 14px;border:1px solid var(--accent);border-radius:9px;
+      background:var(--accent);color:white;font-weight:700;cursor:pointer
+    }
+    .done-button:hover{filter:brightness(1.06)}
+    .cog-item{display:flex;flex-direction:row;align-items:center;gap:6px;padding:7px;border-radius:7px;color:var(--text);cursor:pointer}
+    .cog-item:hover{background:var(--accentSoft)}
+    .cog-item input{margin:0;width:auto}
+    .helper{font-size:.77rem;color:var(--muted);margin-top:4px}
+
+    .legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;font-size:.82rem;color:var(--muted)}
+    .legend span{display:inline-flex;align-items:center;gap:7px}
+    .swatch{width:13px;height:13px;border-radius:4px;display:inline-block}
+    .gear{background:var(--accentSoft);border:1px solid var(--accent)}
+    .dropout{background:var(--goodSoft);border:1px solid var(--good)}
+    .gold{background:var(--accent);border-radius:50%}
+    .half-link-swatch{
+      background:var(--halfLinkSoft);
+      border:2px solid var(--halfLink);
+      border-radius:50%;
+    }
+    .chart-toolbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin:6px 0 10px;
+    }
+    .zoom-hint{
+      color:var(--muted);
+      font-size:.78rem;
+    }
+    .zoom-controls{
+      display:inline-flex;
+      gap:6px;
+    }
+    .zoom-controls button{
+      min-width:36px;
+      padding:7px 10px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--panel);
+      color:var(--text);
+      cursor:pointer;
+    }
+    .zoom-controls button:hover{
+      border-color:var(--accent);
+      background:var(--accentSoft);
+    }
+    #chart-container{position:relative}
+    #chart{
+      display:block;
+      width:100%;
+      height:auto;
+      cursor:grab;
+      touch-action:none;
+      user-select:none;
+    }
+    #chart:active{cursor:grabbing}
+    .tooltip{
+      position:absolute;display:none;pointer-events:none;padding:10px 12px;background:var(--panel);
+      color:var(--text);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+      font-size:.82rem;line-height:1.45
+    }
+    .axis text{fill:var(--muted)}
+    .axis path,.axis line{stroke:var(--border)}
+    .grid line{stroke:var(--border);opacity:.45}.grid path{display:none}
+    .combo-label{font-size:10px;font-weight:700;fill:var(--text);paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+    th{font-size:.78rem;color:var(--muted)}
+    .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:.74rem}
+    .badge.gold{color:var(--accent);background:var(--accentSoft)}
+    .badge.fit{color:var(--good);background:var(--goodSoft)}
+    .badge.other{color:var(--muted);border:1px solid var(--border)}
+    .badge.half-link-badge{
+      margin-left:5px;
+      color:var(--halfLink);
+      background:var(--halfLinkSoft);
+    }
+    .gear-explainer{
+      margin-top:18px;
+      border-top:1px solid var(--border);
+      padding-top:14px;
+    }
+    .gear-explainer summary{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      width:auto;
+      min-height:auto;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      color:var(--accent);
+      font-weight:700;
+      cursor:pointer;
+      overflow:visible;
+    }
+    .gear-explainer summary::after{
+      position:static;
+      transform:none;
+      content:"▾";
+      color:var(--accent);
+      font-size:.9rem;
+      margin-left:2px;
+    }
+    .gear-explainer[open] summary{
+      border-color:transparent;
+    }
+    .gear-explainer[open] summary::after{
+      content:"▴";
+      color:var(--accent);
+    }
+    .gear-explainer-body{
+      margin-top:10px;
+      max-width:850px;
+      color:var(--muted);
+      font-size:.88rem;
+      line-height:1.55;
+    }
+    .gear-explainer-body p{
+      margin:0 0 8px;
+    }
+    .gear-explainer-body ul {
+      margin: 8px 0 12px;
+      padding-left: 20px;
+    }
+    .gear-explainer-body li {
+      margin-bottom: 6px;
+    }
+    .gear-explainer-body p:last-child{
+      margin-bottom:0;
+    }
+    .gear-formula{
+      display:inline-block;
+      margin:2px 0;
+      padding:4px 8px;
+      border:1px solid var(--border);
+      border-radius:7px;
+      background:var(--bg);
+      color:var(--text);
+      font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+      font-size:.82rem;
+    }
+    .checks{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:14px}
+    .checks label{display:flex;flex-direction:row;align-items:center;gap:7px;color:var(--text)}
+    .checks .half-link-control{
+      color:var(--halfLink);
+      font-weight:600;
+    }
+    .checks .half-link-control input{
+      accent-color:var(--halfLink);
+    }
+    .half-link-label{
+      fill:var(--halfLink);
+    }
+    .half-link-text{
+      color:var(--halfLink);
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="site-header">
+    <div>
+      <h1>CogSmith</h1>
+      <div class="subtitle">Find the single-speed gearing that’s perfect for your bike and perfect for your legs.</div>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h2>Bike & gearing</h2>
+
+    <div class="unit-row">
+      <div class="label-with-help">
+        <strong>Units</strong>
+        <span class="help-icon" tabindex="0" role="note"
+          aria-label="Switches displayed measurements between metric and imperial. The bike setup itself does not change."
+          data-tooltip="Switches displayed measurements between metric and imperial. The bike setup itself does not change.">i</span>
+      </div>
+
+      <div class="unit-controls">
+        <div class="unit-copy">Switch measurements without changing the bike setup.</div>
+
+        <div class="unit-toggle" role="group" aria-label="Units of measure">
+          <button id="metricUnits" type="button" aria-pressed="true">Metric</button>
+          <button id="imperialUnits" type="button" aria-pressed="false">Imperial</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="inputs">
+      <div class="multi">
+        <div class="field-label"><span class="label-with-help">Chainrings<span class="help-icon" tabindex="0" role="note" aria-label="Select the chainring sizes you'd like to test." data-tooltip="Select the chainring sizes you'd like to test.">i</span></span></div>
+        <details id="ringDropdown">
+          <summary id="ringSummary">Select chainrings</summary>
+          <div class="menu">
+            <div class="menu-header">
+              <div>
+                <strong>Choose chainrings</strong>
+                <div class="menu-subtitle">Select the chainring sizes you'd like to test.</div>
+              </div>
+              <button id="closeRingMenu" type="button" class="icon-button" aria-label="Close chainring menu">×</button>
+            </div>
+
+            <div class="menu-actions">
+              <button id="selectAllRings" type="button">Select all</button>
+              <button id="clearRings" type="button">Clear</button>
+            </div>
+
+            <div id="ringOptions" class="cog-grid"></div>
+
+            <div class="menu-footer">
+              <button id="doneRings" type="button" class="done-button">Done</button>
+            </div>
+          </div>
+        </details>
+        <div class="helper">Select any tooth counts from 20T to 60T.</div>
+      </div>
+
+      <div class="multi">
+        <div class="field-label"><span class="label-with-help">Rear cogs<span class="help-icon" tabindex="0" role="note" aria-label="Select the rear cogs to test. Tip: Just select the cogs you already have in your parts bin!" data-tooltip="Select the rear cogs to test. Tip: Just select the cogs you already have in your parts bin!">i</span></span></div>
+        <details id="cogDropdown">
+          <summary id="cogSummary">Select rear cogs</summary>
+          <div class="menu">
+            <div class="menu-header">
+              <div>
+                <strong>Choose rear cogs</strong>
+                <div class="menu-subtitle">Select the rear cogs to test. Tip: Just select the cogs you already have in your parts bin!</div>
+              </div>
+              <button id="closeCogMenu" type="button" class="icon-button" aria-label="Close rear cog menu">×</button>
+            </div>
+
+            <div class="menu-actions">
+              <button id="selectAllCogs" type="button">Select all</button>
+              <button id="clearCogs" type="button">Clear</button>
+            </div>
+
+            <div id="cogOptions" class="cog-grid"></div>
+
+            <div class="menu-footer">
+              <button id="doneCogs" type="button" class="done-button">Done</button>
+            </div>
+          </div>
+        </details>
+        <div class="helper">Select any tooth counts from 7T to 52T.</div>
+      </div>
+
+      <label><span class="label-with-help"><span id="wheelLabel">Wheel diameter (mm)</span><span class="help-icon" tabindex="0" role="note" aria-label="The outer diameter of your inflated tire. Measuring this yourself yields the most accurate gear-inch calculation." data-tooltip="The outer diameter of your inflated tire. Measuring this yourself yields the most accurate gear-inch calculation.">i</span></span>
+        <input id="wheel" type="number" value="660.4" step="1">
+      </label>
+
+      <label><span class="label-with-help"><span id="chainstayLabel">Chainstay length (mm)</span><span class="help-icon" tabindex="0" role="note" aria-label="The distance from the center of your bottom bracket to the center of your rear axle. This tells us which chain lengths will actually fit your frame." data-tooltip="The distance from the center of your bottom bracket to the center of your rear axle. This tells us which chain lengths will actually fit your frame.">i</span></span>
+        <input id="chainstay" type="number" value="423" step="1">
+      </label>
+
+      <label><span class="label-with-help"><span id="dropoutLabel">Dropout travel ± (mm)</span><span class="help-icon" tabindex="0" role="note" aria-label="How much wiggle room your rear axle has (forward and backward) from your measured chainstay length. Track ends and horizontal dropouts have more travel." data-tooltip="How much wiggle room your rear axle has (forward and backward) from your measured chainstay length. Track ends and horizontal dropouts have more travel.">i</span></span>
+        <input id="dropout" type="number" value="10" step="0.5">
+      </label>
+
+      <label><span class="label-with-help">Target gear inches<span class="help-icon" tabindex="0" role="note" aria-label="Your ideal pedaling difficulty. Higher numbers = harder to pedal, higher top speed. Lower numbers = easier to pedal, better for climbing." data-tooltip="Your ideal pedaling difficulty. Higher numbers = harder to pedal, higher top speed. Lower numbers = easier to pedal, better for climbing.">i</span></span>
+        <input id="target" type="number" value="60" step="0.1">
+      </label>
+
+      <label><span class="label-with-help">Gear-inch tolerance ±<span class="help-icon" tabindex="0" role="note" aria-label="The acceptable range around your target. For example, a target of 60 ± 3 will show options between 57 and 63 gear inches." data-tooltip="The acceptable range around your target. For example, a target of 60 ± 3 will show options between 57 and 63 gear inches.">i</span></span>
+        <input id="tolerance" type="number" value="3" step="0.1">
+      </label>
+    </div>
+
+    <div class="checks">
+      <label class="half-link-control"><input id="halfLink" type="checkbox"><span class="label-with-help">Include half-link chains<span class="help-icon" tabindex="0" role="note" aria-label="Adds the extra axle positions possible when a half-link is used. Standard-chain points stay visible so you can compare both sets of options." data-tooltip="Adds the extra axle positions possible when a half-link is used. Standard-chain points stay visible so you can compare both sets of options.">i</span></span></label>
+    </div>
+
+    <details class="gear-explainer">
+      <summary>What are gear inches?</summary>
+      <div class="gear-explainer-body">
+        <p><strong>Gear inches</strong> are a universal way to compare how "hard" or "easy" a bicycle gear feels, regardless of wheel size.</p>
+        <ul>
+          <li><strong>Higher numbers (e.g. 75"):</strong> A harder gear that travels further with each pedal stroke. Great for flat roads and speed.</li>
+          <li><strong>Lower numbers (e.g. 50"):</strong> An easier gear that requires less effort. Better for climbing hills or trail riding.</li>
+        </ul>
+        <p>The basic calculation is: <span class="gear-formula">wheel diameter × chainring teeth ÷ rear cog teeth</span></p>
+        <p><em>Note: Gear inches only describe the ratio, not the physical fit. CogSmith takes this a step further by checking your chainstay length to find combinations that will actually fit your bike without a chain tensioner.</em></p>
+      </div>
+    </details>
+  </section>
+
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-label">Best combination</div>
+      <div id="bestCombo" class="stat-value">—</div>
+      <div id="bestGear" class="stat-detail"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Axle adjustment</div>
+      <div id="bestShift" class="stat-value">—</div>
+      <div class="stat-detail">shift from current axle position</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Chain length</div>
+      <div id="bestChain" class="stat-value">—</div>
+      <div class="stat-detail">total length of the chain</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Goldilocks combinations</div>
+      <div id="goldCount" class="stat-value">—</div>
+      <div class="stat-detail">perfect frame fit & ideal gearing</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Magic gear map</h2>
+    <div class="legend">
+      <span><i class="swatch gear"></i>Target gear-inch range</span>
+      <span><i class="swatch dropout"></i>Dropout adjustment range</span>
+      <span><i class="swatch gold"></i>Goldilocks combination</span>
+      <span id="halfLinkLegend" style="display:none"><i class="swatch half-link-swatch"></i>Half-link option</span>
+    </div>
+
+    <div class="chart-toolbar">
+      <div class="zoom-hint">Scroll or pinch to zoom · drag to pan</div>
+      <div class="zoom-controls" aria-label="Chart zoom controls">
+        <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+        <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+        <button id="zoomReset" type="button">Reset zoom</button>
+      </div>
+    </div>
+
+    <div id="chart-container">
+      <svg id="chart" role="img" aria-label="Single-speed gearing chart"></svg>
+      <div id="tooltip" class="tooltip"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Best combinations</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Setup</th>
+            <th>Gear inches</th>
+            <th>Chainstay</th>
+            <th>Axle shift</th>
+            <th>Chain</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="results"></tbody>
+      </table>
+    </div>
+  </section>
+  <footer class="report-footer">
+    <div class="report-footer-copy">
+      <strong>Save your perfect setup</strong>
+      <span>Download a PDF report with your fit results, gearing data, and the magic gear map so you can take it to the workbench.</span>
+    </div>
+
+    <button id="generatePdf" class="report-button" type="button">
+      <span class="report-icon" aria-hidden="true">PDF</span>
+      Generate PDF report
+    </button>
+  </footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let unitSystem = "metric";
+
+const IN_TO_MM = 25.4;
+const IN_TO_CM = 2.54;
+
+// Keep the current chart view when the calculator redraws, such as when
+// half-link points are toggled on or off.
+let chartZoomTransform = d3.zoomIdentity;
+let activeChartZoom = null;
+let activeChartSvg = null;
+
+function uiWheelToInches(value) {
+  return unitSystem === "metric" ? value / IN_TO_MM : value;
+}
+
+function uiChainstayToInches(value) {
+  return unitSystem === "metric" ? value / IN_TO_MM : value;
+}
+
+function uiDropoutToInches(value) {
+  return unitSystem === "metric" ? value / IN_TO_MM : value;
+}
+
+function inchesToUiChainstay(value) {
+  return unitSystem === "metric" ? value * IN_TO_MM : value;
+}
+
+function inchesToUiDropout(value) {
+  return unitSystem === "metric" ? value * IN_TO_MM : value;
+}
+
+function formatChainstay(inches) {
+  return unitSystem === "metric"
+    ? `${(inches * IN_TO_MM).toFixed(1)} mm`
+    : `${inches.toFixed(3)} in`;
+}
+
+function formatShift(inches) {
+  const sign = inches >= 0 ? "+" : "−";
+  const absolute = Math.abs(inches);
+
+  return unitSystem === "metric"
+    ? `${sign}${(absolute * IN_TO_MM).toFixed(1)} mm`
+    : `${sign}${absolute.toFixed(3)} in`;
+}
+
+function formatChainLength(inches) {
+  if (unitSystem === "metric") {
+    return `${(inches * IN_TO_CM).toFixed(1)} cm`;
+  }
+
+  return Number.isInteger(inches)
+    ? `${inches.toFixed(0)} in`
+    : `${inches.toFixed(1)} in`;
+}
+
+function setUnitSystem(next) {
+  if (next === unitSystem) return;
+
+  // Read current values into canonical inches before changing the mode.
+  const wheelIn = uiWheelToInches(Number($("wheel").value));
+  const chainstayIn = uiChainstayToInches(Number($("chainstay").value));
+  const dropoutIn = uiDropoutToInches(Number($("dropout").value));
+
+  unitSystem = next;
+
+  if (unitSystem === "metric") {
+    $("wheel").value = (wheelIn * IN_TO_MM).toFixed(1);
+    $("chainstay").value = (chainstayIn * IN_TO_MM).toFixed(1);
+    $("dropout").value = (dropoutIn * IN_TO_MM).toFixed(1);
+
+    $("wheel").step = "1";
+    $("chainstay").step = "1";
+    $("dropout").step = "0.5";
+
+    $("wheelLabel").textContent = "Wheel diameter (mm)";
+    $("chainstayLabel").textContent = "Chainstay length (mm)";
+    $("dropoutLabel").textContent = "Dropout travel ± (mm)";
+  } else {
+    $("wheel").value = wheelIn.toFixed(2);
+    $("chainstay").value = chainstayIn.toFixed(3);
+    $("dropout").value = dropoutIn.toFixed(3);
+
+    $("wheel").step = "0.01";
+    $("chainstay").step = "0.01";
+    $("dropout").step = "0.01";
+
+    $("wheelLabel").textContent = "Wheel diameter (in)";
+    $("chainstayLabel").textContent = "Chainstay length (in)";
+    $("dropoutLabel").textContent = "Dropout travel ± (in)";
+  }
+
+  $("metricUnits").setAttribute("aria-pressed", unitSystem === "metric");
+  $("imperialUnits").setAttribute("aria-pressed", unitSystem === "imperial");
+
+  update();
+}
+
+const MIN_RING = 20;
+const MAX_RING = 60;
+
+// Default chainrings shown on first load.
+const defaultRings = [28, 38, 48];
+
+function buildRingSelector() {
+  const container = $("ringOptions");
+  container.innerHTML = "";
+
+  for (let ring = MIN_RING; ring <= MAX_RING; ring++) {
+    const label = document.createElement("label");
+    label.className = "cog-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = ring;
+    checkbox.className = "ring-checkbox";
+    checkbox.checked = defaultRings.includes(ring);
+
+    const text = document.createElement("span");
+    text.textContent = `${ring}T`;
+
+    label.append(checkbox, text);
+    container.appendChild(label);
+
+    checkbox.addEventListener("change", () => {
+      updateRingSummary();
+      update();
+    });
+  }
+
+  updateRingSummary();
+}
+
+function getSelectedRings() {
+  return [...document.querySelectorAll(".ring-checkbox:checked")]
+    .map(x => Number(x.value))
+    .sort((a, b) => a - b);
+}
+
+function updateRingSummary() {
+  const selected = getSelectedRings();
+  const summary = $("ringSummary");
+
+  if (!selected.length) {
+    summary.textContent = "No chainrings selected";
+  } else if (selected.length === MAX_RING - MIN_RING + 1) {
+    summary.textContent = "All chainrings (20T–60T)";
+  } else if (selected.length <= 6) {
+    summary.textContent = selected.map(x => `${x}T`).join(", ");
+  } else {
+    summary.textContent = `${selected.length} chainrings selected`;
+  }
+}
+
+$("selectAllRings").addEventListener("click", () => {
+  document.querySelectorAll(".ring-checkbox").forEach(x => x.checked = true);
+  updateRingSummary();
+  update();
+});
+
+$("clearRings").addEventListener("click", () => {
+  document.querySelectorAll(".ring-checkbox").forEach(x => x.checked = false);
+  updateRingSummary();
+  update();
+});
+
+function closeRingMenu() {
+  $("ringDropdown").removeAttribute("open");
+}
+
+$("closeRingMenu").addEventListener("click", closeRingMenu);
+$("doneRings").addEventListener("click", closeRingMenu);
+
+const MIN_COG = 7;
+const MAX_COG = 52;
+const defaultCogs = [11, 13, 15, 18, 21];
+
+function buildCogSelector() {
+  const container = $("cogOptions");
+  container.innerHTML = "";
+
+  for (let cog = MIN_COG; cog <= MAX_COG; cog++) {
+    const label = document.createElement("label");
+    label.className = "cog-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = cog;
+    checkbox.className = "cog-checkbox";
+    checkbox.checked = defaultCogs.includes(cog);
+
+    const text = document.createElement("span");
+    text.textContent = `${cog}T`;
+
+    label.append(checkbox, text);
+    container.appendChild(label);
+
+    checkbox.addEventListener("change", () => {
+      updateCogSummary();
+      update();
+    });
+  }
+
+  updateCogSummary();
+}
+
+function getSelectedCogs() {
+  return [...document.querySelectorAll(".cog-checkbox:checked")]
+    .map(x => Number(x.value))
+    .sort((a,b) => a-b);
+}
+
+function updateCogSummary() {
+  const selected = getSelectedCogs();
+  const summary = $("cogSummary");
+
+  if (!selected.length) summary.textContent = "No rear cogs selected";
+  else if (selected.length === MAX_COG - MIN_COG + 1) summary.textContent = "All cogs (7T–52T)";
+  else if (selected.length <= 6) summary.textContent = selected.map(x => `${x}T`).join(", ");
+  else summary.textContent = `${selected.length} cogs selected`;
+}
+
+$("selectAllCogs").addEventListener("click", () => {
+  document.querySelectorAll(".cog-checkbox").forEach(x => x.checked = true);
+  updateCogSummary();
+  update();
+});
+
+$("clearCogs").addEventListener("click", () => {
+  document.querySelectorAll(".cog-checkbox").forEach(x => x.checked = false);
+  updateCogSummary();
+  update();
+});
+
+function closeCogMenu() {
+  $("cogDropdown").removeAttribute("open");
+}
+
+$("closeCogMenu").addEventListener("click", closeCogMenu);
+$("doneCogs").addEventListener("click", closeCogMenu);
+
+document.addEventListener("click", event => {
+  const ringDropdown = $("ringDropdown");
+  const cogDropdown = $("cogDropdown");
+
+  if (
+    ringDropdown.hasAttribute("open") &&
+    !ringDropdown.contains(event.target)
+  ) {
+    closeRingMenu();
+  }
+
+  if (
+    cogDropdown.hasAttribute("open") &&
+    !cogDropdown.contains(event.target)
+  ) {
+    closeCogMenu();
+  }
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeRingMenu();
+    closeCogMenu();
+  }
+});
+
+function sprocketRadius(teeth) {
+  return teeth / (4 * Math.PI);
+}
+
+function chainPath(chainring, cog, chainstay) {
+  const ringRadius = sprocketRadius(chainring);
+  const cogRadius = sprocketRadius(cog);
+  const difference = ringRadius - cogRadius;
+
+  if (Math.abs(difference) >= chainstay) return NaN;
+
+  const thetaDegrees = Math.acos(difference / chainstay) * 180 / Math.PI;
+
+  return (
+    (180 - thetaDegrees) * Math.PI * ringRadius +
+    thetaDegrees * Math.PI * cogRadius +
+    180 * Math.sqrt(chainstay ** 2 - difference ** 2)
+  ) / 90;
+}
+
+function solveChainstay(chainring, cog, chainLength, approximateChainstay) {
+  let low = Math.max(2, approximateChainstay - 5);
+  let high = approximateChainstay + 5;
+
+  for (let i = 0; i < 90; i++) {
+    const midpoint = (low + high) / 2;
+    const path = chainPath(chainring, cog, midpoint);
+    if (!Number.isFinite(path) || path < chainLength) low = midpoint;
+    else high = midpoint;
+  }
+
+  return (low + high) / 2;
+}
+
+function calculateCombinations() {
+  const selectedRings = getSelectedRings();
+  const selectedCogs = getSelectedCogs();
+  const wheel = uiWheelToInches(Number($("wheel").value));
+  const chainstayIn = uiChainstayToInches(Number($("chainstay").value));
+  const target = Number($("target").value);
+  const tolerance = Number($("tolerance").value);
+  const dropoutTravelIn = uiDropoutToInches(Number($("dropout").value));
+
+  const combinations = [];
+
+  function addSolution(ring, cog, gearInches, chainLength, isHalfLink) {
+    const requiredChainstayIn =
+      solveChainstay(ring, cog, chainLength, chainstayIn);
+
+    const axleShiftIn =
+      requiredChainstayIn - chainstayIn;
+
+    const gearError =
+      Math.abs(gearInches - target);
+
+    const gearMatch =
+      gearError <= tolerance;
+
+    const dropoutMatch =
+      Math.abs(axleShiftIn) <= dropoutTravelIn;
+
+    const goldilocks =
+      gearMatch && dropoutMatch;
+
+    // Preserve the original ranking weight by expressing axle error in mm.
+    // A tiny tie-break penalty keeps a standard chain ahead of an otherwise
+    // identical half-link result.
+    const score =
+      gearError * 10 +
+      Math.abs(axleShiftIn * IN_TO_MM) * 0.2 +
+      (isHalfLink ? 0.001 : 0);
+
+    combinations.push({
+      ring,
+      cog,
+      gearInches,
+      chainLength,
+      requiredChainstayIn,
+      axleShiftIn,
+      gearError,
+      gearMatch,
+      dropoutMatch,
+      goldilocks,
+      isHalfLink,
+      score
+    });
+  }
+
+  for (const ring of selectedRings) {
+    for (const cog of selectedCogs) {
+      const gearInches =
+        wheel * ring / cog;
+
+      const theoreticalChain =
+        chainPath(ring, cog, chainstayIn);
+
+      if (!Number.isFinite(theoreticalChain)) {
+        continue;
+      }
+
+      /*
+       * Standard chains:
+       * usable lengths fall on whole-inch increments.
+       */
+      const standardChainLength =
+        Math.round(theoreticalChain);
+
+      addSolution(
+        ring,
+        cog,
+        gearInches,
+        standardChainLength,
+        false
+      );
+
+      /*
+       * Half-link option:
+       * this is an ADDITIONAL possible chain length, always landing
+       * on an x.5-inch length. It does not replace the standard point.
+       */
+      const halfLinkChainLength =
+        Math.round(theoreticalChain - 0.5) + 0.5;
+
+      addSolution(
+        ring,
+        cog,
+        gearInches,
+        halfLinkChainLength,
+        true
+      );
+    }
+  }
+
+  return combinations;
+}
+
+function getStatus(item) {
+  if (item.goldilocks) return "Goldilocks";
+  if (item.gearMatch) return "Gear match";
+  if (item.dropoutMatch) return "Fits dropout";
+  return "Outside";
+}
+
+function renderSummary(data) {
+  const sorted = [...data].sort((a,b) => a.score - b.score);
+  const best = sorted[0];
+
+  if (!best) {
+    $("bestCombo").textContent = "—";
+    $("bestGear").textContent = "Select chainrings & cogs above to see results";
+    $("bestShift").textContent = "—";
+    $("bestChain").textContent = "—";
+    $("goldCount").textContent = "0";
+    return;
+  }
+
+  $("bestCombo").textContent = `${best.ring} × ${best.cog}`;
+  $("bestGear").textContent =
+    `${best.gearInches.toFixed(1)} gear inches · ${best.isHalfLink ? "Half-link" : "Standard chain"}`;
+
+  $("bestShift").textContent =
+    formatShift(best.axleShiftIn);
+
+  $("bestChain").textContent =
+    `${formatChainLength(best.chainLength)}${best.isHalfLink ? " · ½-link" : ""}`;
+  $("goldCount").textContent = data.filter(x => x.goldilocks).length;
+}
+
+function renderTable(data) {
+  const rows = [...data].sort((a,b) => a.score - b.score).slice(0,25);
+
+  $("results").innerHTML = rows.map(item => {
+    const badgeClass = item.goldilocks ? "gold" : item.dropoutMatch ? "fit" : "other";
+
+    return `
+      <tr>
+        <td><strong>${item.ring} × ${item.cog}</strong></td>
+        <td>${item.gearInches.toFixed(1)}"</td>
+        <td>${formatChainstay(item.requiredChainstayIn)}</td>
+        <td>${formatShift(item.axleShiftIn)}</td>
+        <td>
+          ${formatChainLength(item.chainLength)}
+          ${item.isHalfLink ? '<span class="badge half-link-badge">½-link</span>' : ''}
+        </td>
+        <td><span class="badge ${badgeClass}">${getStatus(item)}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderChart(data) {
+  const svg = d3.select("#chart");
+  svg.selectAll("*").remove();
+
+  if (!data.length) {
+    activeChartZoom = null;
+    activeChartSvg = null;
+    return;
+  }
+
+  const showHalfLinks =
+    $("halfLink").checked;
+
+  const standardData =
+    data.filter(d => !d.isHalfLink);
+
+  const halfLinkData =
+    data.filter(d => d.isHalfLink);
+
+  /*
+   * Both standard and half-link solutions participate in the base domain.
+   * That keeps the underlying "whole picture" stable when half-link points
+   * are shown or hidden.
+   */
+  const domainData =
+    [...standardData, ...halfLinkData];
+
+  const width = 1100;
+  const height = 620;
+
+  const margin = {
+    top: 25,
+    right: 35,
+    bottom: 65,
+    left: 75
+  };
+
+  const plotLeft = margin.left;
+  const plotRight = width - margin.right;
+  const plotTop = margin.top;
+  const plotBottom = height - margin.bottom;
+  const plotWidth = plotRight - plotLeft;
+  const plotHeight = plotBottom - plotTop;
+
+  svg.attr(
+    "viewBox",
+    `0 0 ${width} ${height}`
+  );
+
+  const measuredChainstayIn =
+    uiChainstayToInches(
+      Number($("chainstay").value)
+    );
+
+  const dropoutTravelIn =
+    uiDropoutToInches(
+      Number($("dropout").value)
+    );
+
+  const measuredChainstay =
+    inchesToUiChainstay(
+      measuredChainstayIn
+    );
+
+  const dropoutTravel =
+    inchesToUiDropout(
+      dropoutTravelIn
+    );
+
+  const target =
+    Number($("target").value);
+
+  const tolerance =
+    Number($("tolerance").value);
+
+  const xExtent =
+    d3.extent(
+      domainData,
+      d => inchesToUiChainstay(
+        d.requiredChainstayIn
+      )
+    );
+
+  const yExtent =
+    d3.extent(
+      domainData,
+      d => d.gearInches
+    );
+
+  const xPadding =
+    Math.max(
+      unitSystem === "metric" ? 5 : .2,
+      (xExtent[1] - xExtent[0]) * .06
+    );
+
+  const x =
+    d3.scaleLinear()
+      .domain([
+        Math.min(
+          xExtent[0],
+          measuredChainstay - dropoutTravel
+        ) - xPadding,
+
+        Math.max(
+          xExtent[1],
+          measuredChainstay + dropoutTravel
+        ) + xPadding
+      ])
+      .range([
+        plotLeft,
+        plotRight
+      ]);
+
+  const y =
+    d3.scaleLinear()
+      .domain([
+        Math.min(
+          yExtent[0],
+          target - tolerance
+        ) - 5,
+
+        Math.max(
+          yExtent[1],
+          target + tolerance
+        ) + 5
+      ])
+      .nice()
+      .range([
+        plotBottom,
+        plotTop
+      ]);
+
+  /*
+   * Clip everything inside the plotting area while zooming/panning so dots
+   * and shaded bands never draw over the axes or labels.
+   */
+  svg.append("defs")
+    .append("clipPath")
+    .attr("id", "plotClip")
+    .append("rect")
+    .attr("x", plotLeft)
+    .attr("y", plotTop)
+    .attr("width", plotWidth)
+    .attr("height", plotHeight);
+
+  const plot =
+    svg.append("g")
+      .attr(
+        "clip-path",
+        "url(#plotClip)"
+      );
+
+  const xGrid =
+    plot.append("g")
+      .attr("class", "grid")
+      .attr(
+        "transform",
+        `translate(0,${plotBottom})`
+      );
+
+  const yGrid =
+    plot.append("g")
+      .attr("class", "grid")
+      .attr(
+        "transform",
+        `translate(${plotLeft},0)`
+      );
+
+  const dropoutBand =
+    plot.append("rect")
+      .attr(
+        "fill",
+        "var(--goodSoft)"
+      )
+      .attr(
+        "opacity",
+        .68
+      );
+
+  const targetBand =
+    plot.append("rect")
+      .attr(
+        "fill",
+        "var(--accentSoft)"
+      )
+      .attr(
+        "opacity",
+        .68
+      );
+
+  const measuredChainstayLine =
+    plot.append("line")
+      .attr(
+        "stroke",
+        "var(--good)"
+      )
+      .attr(
+        "stroke-width",
+        2
+      )
+      .attr(
+        "stroke-dasharray",
+        "6 5"
+      );
+
+  const targetLine =
+    plot.append("line")
+      .attr(
+        "stroke",
+        "var(--accent)"
+      )
+      .attr(
+        "stroke-width",
+        2
+      )
+      .attr(
+        "stroke-dasharray",
+        "6 5"
+      );
+
+  const xAxis =
+    svg.append("g")
+      .attr("class", "axis")
+      .attr(
+        "transform",
+        `translate(0,${plotBottom})`
+      );
+
+  const yAxis =
+    svg.append("g")
+      .attr("class", "axis")
+      .attr(
+        "transform",
+        `translate(${plotLeft},0)`
+      );
+
+  svg.append("text")
+    .attr(
+      "x",
+      (plotLeft + plotRight) / 2
+    )
+    .attr(
+      "y",
+      height - 15
+    )
+    .attr(
+      "text-anchor",
+      "middle"
+    )
+    .attr(
+      "fill",
+      "var(--text)"
+    )
+    .text(
+      unitSystem === "metric"
+        ? "Required chainstay length (mm)"
+        : "Required chainstay length (in)"
+    );
+
+  svg.append("text")
+    .attr(
+      "transform",
+      "rotate(-90)"
+    )
+    .attr(
+      "x",
+      -(plotTop + plotBottom) / 2
+    )
+    .attr(
+      "y",
+      20
+    )
+    .attr(
+      "text-anchor",
+      "middle"
+    )
+    .attr(
+      "fill",
+      "var(--text)"
+    )
+    .text(
+      "Gear inches"
+    );
+
+  const tooltip =
+    d3.select("#tooltip");
+
+  function attachTooltip(
+    groups,
+    restingRadius
+  ) {
+    groups
+      .on(
+        "mouseenter",
+        function(event, d) {
+          d3.select(this)
+            .select("circle")
+            .attr(
+              "r",
+              d.goldilocks ? 8 : 7
+            );
+
+          tooltip
+            .style(
+              "display",
+              "block"
+            )
+            .html(`
+              <strong>${d.ring} × ${d.cog}</strong><br>
+              ${d.gearInches.toFixed(1)} gear inches<br>
+              ${formatChainstay(d.requiredChainstayIn)} chainstay<br>
+              ${formatShift(d.axleShiftIn)} axle shift<br>
+              ${formatChainLength(d.chainLength)} chain<br>
+              <strong class="${d.isHalfLink ? "half-link-text" : ""}">
+                ${d.isHalfLink ? "Half-link option" : "Standard chain"}
+              </strong><br>
+              ${getStatus(d)}
+            `);
+        }
+      )
+      .on(
+        "mousemove",
+        function(event) {
+          const r =
+            $("chart-container")
+              .getBoundingClientRect();
+
+          tooltip
+            .style(
+              "left",
+              `${event.clientX - r.left + 14}px`
+            )
+            .style(
+              "top",
+              `${event.clientY - r.top + 14}px`
+            );
+        }
+      )
+      .on(
+        "mouseleave",
+        function(event, d) {
+          d3.select(this)
+            .select("circle")
+            .attr(
+              "r",
+              restingRadius(d)
+            );
+
+          tooltip.style(
+            "display",
+            "none"
+          );
+        }
+      );
+  }
+
+  /*
+   * STANDARD CHAIN POINTS
+   */
+  const standardGroups =
+    plot.append("g")
+      .attr(
+        "aria-label",
+        "Standard chain options"
+      )
+      .selectAll("g")
+      .data(standardData)
+      .join("g");
+
+  standardGroups
+    .append("circle")
+    .attr(
+      "r",
+      d => d.goldilocks ? 6 : 3.5
+    )
+    .attr(
+      "fill",
+      d => d.goldilocks
+        ? "var(--accent)"
+        : "var(--point)"
+    )
+    .attr(
+      "opacity",
+      d => d.goldilocks
+        ? 1
+        : (
+            d.gearMatch ||
+            d.dropoutMatch
+              ? .8
+              : .35
+          )
+    );
+
+  standardGroups
+    .filter(d => d.goldilocks)
+    .append("text")
+    .attr(
+      "class",
+      "combo-label"
+    )
+    .attr("x", 8)
+    .attr("y", -7)
+    .text(
+      d => `${d.ring}×${d.cog}`
+    );
+
+  attachTooltip(
+    standardGroups,
+    d => d.goldilocks ? 6 : 3.5
+  );
+
+  /*
+   * HALF-LINK OVERLAY
+   */
+  let halfGroups = null;
+
+  if (showHalfLinks) {
+    halfGroups =
+      plot.append("g")
+        .attr(
+          "aria-label",
+          "Half-link options"
+        )
+        .selectAll("g")
+        .data(halfLinkData)
+        .join("g");
+
+    halfGroups
+      .append("circle")
+      .attr(
+        "r",
+        d => d.goldilocks ? 6 : 4.3
+      )
+      .attr(
+        "fill",
+        d => d.goldilocks
+          ? "var(--halfLinkSoft)"
+          : "var(--panel)"
+      )
+      .attr(
+        "stroke",
+        "var(--halfLink)"
+      )
+      .attr(
+        "stroke-width",
+        d => d.goldilocks ? 2.5 : 1.6
+      )
+      .attr(
+        "opacity",
+        d => d.goldilocks
+          ? 1
+          : (
+              d.gearMatch ||
+              d.dropoutMatch
+                ? .9
+                : .55
+            )
+      );
+
+    halfGroups
+      .filter(d => d.goldilocks)
+      .append("text")
+      .attr(
+        "class",
+        "combo-label half-link-label"
+      )
+      .attr("x", 8)
+      .attr("y", 12)
+      .text(
+        d => `${d.ring}×${d.cog} ½`
+      );
+
+    attachTooltip(
+      halfGroups,
+      d => d.goldilocks ? 6 : 4.3
+    );
+  }
+
+  const xTickFormat =
+    unitSystem === "metric"
+      ? d3.format(".1f")
+      : d3.format(".3f");
+
+  /*
+   * Redraw every screen-position-dependent element from transformed scales.
+   * Circle radii and label sizes stay constant, making the chart readable
+   * even at high zoom levels.
+   */
+  function redraw(transform) {
+    const zx =
+      transform.rescaleX(x);
+
+    const zy =
+      transform.rescaleY(y);
+
+    xGrid.call(
+      d3.axisBottom(zx)
+        .ticks(10)
+        .tickSize(-plotHeight)
+        .tickFormat("")
+    );
+
+    yGrid.call(
+      d3.axisLeft(zy)
+        .ticks(10)
+        .tickSize(-plotWidth)
+        .tickFormat("")
+    );
+
+    xAxis.call(
+      d3.axisBottom(zx)
+        .ticks(10)
+        .tickFormat(xTickFormat)
+    );
+
+    yAxis.call(
+      d3.axisLeft(zy)
+        .ticks(10)
+    );
+
+    dropoutBand
+      .attr(
+        "x",
+        zx(
+          measuredChainstay -
+          dropoutTravel
+        )
+      )
+      .attr(
+        "y",
+        plotTop
+      )
+      .attr(
+        "width",
+        Math.max(
+          0,
+          zx(
+            measuredChainstay +
+            dropoutTravel
+          ) -
+          zx(
+            measuredChainstay -
+            dropoutTravel
+          )
+        )
+      )
+      .attr(
+        "height",
+        plotHeight
+      );
+
+    targetBand
+      .attr(
+        "x",
+        plotLeft
+      )
+      .attr(
+        "y",
+        zy(
+          target +
+          tolerance
+        )
+      )
+      .attr(
+        "width",
+        plotWidth
+      )
+      .attr(
+        "height",
+        Math.max(
+          0,
+          zy(
+            target -
+            tolerance
+          ) -
+          zy(
+            target +
+            tolerance
+          )
+        )
+      );
+
+    measuredChainstayLine
+      .attr(
+        "x1",
+        zx(measuredChainstay)
+      )
+      .attr(
+        "x2",
+        zx(measuredChainstay)
+      )
+      .attr(
+        "y1",
+        plotTop
+      )
+      .attr(
+        "y2",
+        plotBottom
+      );
+
+    targetLine
+      .attr(
+        "x1",
+        plotLeft
+      )
+      .attr(
+        "x2",
+        plotRight
+      )
+      .attr(
+        "y1",
+        zy(target)
+      )
+      .attr(
+        "y2",
+        zy(target)
+      );
+
+    standardGroups
+      .attr(
+        "transform",
+        d => `translate(
+          ${zx(
+            inchesToUiChainstay(
+              d.requiredChainstayIn
+            )
+          )},
+          ${zy(d.gearInches)}
+        )`
+      );
+
+    if (halfGroups) {
+      halfGroups
+        .attr(
+          "transform",
+          d => `translate(
+            ${zx(
+              inchesToUiChainstay(
+                d.requiredChainstayIn
+              )
+            )},
+            ${zy(d.gearInches)}
+          )`
+        );
+    }
+  }
+
+  const zoom =
+    d3.zoom()
+      .scaleExtent([
+        1,
+        20
+      ])
+      .extent([
+        [plotLeft, plotTop],
+        [plotRight, plotBottom]
+      ])
+      .translateExtent([
+        [plotLeft, plotTop],
+        [plotRight, plotBottom]
+      ])
+      .filter(event => {
+        if (
+          event.type === "mousedown"
+        ) {
+          return event.button === 0;
+        }
+
+        return true;
+      })
+      .on(
+        "zoom",
+        event => {
+          chartZoomTransform =
+            event.transform;
+
+          tooltip.style(
+            "display",
+            "none"
+          );
+
+          redraw(
+            chartZoomTransform
+          );
+        }
+      );
+
+  activeChartZoom =
+    zoom;
+
+  activeChartSvg =
+    svg;
+
+  svg.call(
+    zoom
+  );
+
+  // Double-click is kept free from D3's default zoom so the dedicated
+  // controls remain predictable.
+  svg.on(
+    "dblclick.zoom",
+    null
+  );
+
+  /*
+   * Restore the current view after a redraw. This is especially useful when
+   * enabling the half-link overlay while already zoomed into a promising
+   * cluster.
+   */
+  svg.call(
+    zoom.transform,
+    chartZoomTransform
+  );
+
+  $("halfLinkLegend").style.display =
+    showHalfLinks
+      ? "inline-flex"
+      : "none";
+}
+
+
+function formatToothSelection(values) {
+  if (!values.length) {
+    return "None";
+  }
+
+  const parts = [];
+  let start = values[0];
+  let previous = values[0];
+
+  function pushRange(a, b) {
+    if (a === b) {
+      parts.push(`${a}T`);
+    } else if (b === a + 1) {
+      parts.push(`${a}T, ${b}T`);
+    } else {
+      parts.push(`${a}T-${b}T`);
+    }
+  }
+
+  for (let i = 1; i < values.length; i++) {
+    const value = values[i];
+
+    if (value === previous + 1) {
+      previous = value;
+      continue;
+    }
+
+    pushRange(start, previous);
+    start = value;
+    previous = value;
+  }
+
+  pushRange(start, previous);
+  return parts.join(", ");
+}
+
+function pdfChainstayValue(inches) {
+  return unitSystem === "metric"
+    ? `${(inches * IN_TO_MM).toFixed(1)} mm`
+    : `${inches.toFixed(3)} in`;
+}
+
+function pdfShiftValue(inches) {
+  const sign = inches >= 0 ? "+" : "-";
+  const absolute = Math.abs(inches);
+
+  return unitSystem === "metric"
+    ? `${sign}${(absolute * IN_TO_MM).toFixed(1)} mm`
+    : `${sign}${absolute.toFixed(3)} in`;
+}
+
+function pdfChainLengthValue(inches) {
+  return unitSystem === "metric"
+    ? `${(inches * IN_TO_CM).toFixed(1)} cm`
+    : `${Number.isInteger(inches) ? inches.toFixed(0) : inches.toFixed(1)} in`;
+}
+
+function setPdfTextColor(doc, type = "text") {
+  if (type === "muted") {
+    doc.setTextColor(90, 98, 112);
+  } else if (type === "accent") {
+    doc.setTextColor(91, 53, 170);
+  } else if (type === "gold") {
+    doc.setTextColor(145, 99, 0);
+  } else if (type === "green") {
+    doc.setTextColor(20, 115, 72);
+  } else {
+    doc.setTextColor(30, 38, 52);
+  }
+}
+
+function pdfSectionTitle(doc, title, y) {
+  setPdfTextColor(doc, "text");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(title, 14, y);
+  doc.setDrawColor(220, 223, 230);
+  doc.line(14, y + 2, 196, y + 2);
+  return y + 8;
+}
+
+function pdfKeyValue(doc, label, value, x, y, width = 84) {
+  setPdfTextColor(doc, "muted");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.text(label, x, y);
+
+  setPdfTextColor(doc, "text");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+
+  const lines = doc.splitTextToSize(String(value), width);
+  doc.text(lines, x, y + 4);
+
+  return y + 4 + lines.length * 4;
+}
+
+async function chartToPngDataUrl() {
+  const sourceSvg = $("chart");
+
+  if (!sourceSvg || !sourceSvg.children.length) {
+    return null;
+  }
+
+  const clone = sourceSvg.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", "1100");
+  clone.setAttribute("height", "620");
+
+  const sourceNodes = [
+    sourceSvg,
+    ...sourceSvg.querySelectorAll("*")
+  ];
+
+  const cloneNodes = [
+    clone,
+    ...clone.querySelectorAll("*")
+  ];
+
+  sourceNodes.forEach((node, index) => {
+    const cloneNode = cloneNodes[index];
+
+    if (!cloneNode) {
+      return;
+    }
+
+    const style = getComputedStyle(node);
+
+    [
+      "fill",
+      "stroke",
+      "color",
+      "opacity",
+      "font-family",
+      "font-size",
+      "font-weight"
+    ].forEach(property => {
+      const value = style.getPropertyValue(property);
+
+      if (value) {
+        cloneNode.style.setProperty(property, value);
+      }
+    });
+  });
+
+  const serializer =
+    new XMLSerializer();
+
+  const svgText =
+    serializer.serializeToString(clone);
+
+  const blob =
+    new Blob(
+      [svgText],
+      { type: "image/svg+xml;charset=utf-8" }
+    );
+
+  const objectUrl =
+    URL.createObjectURL(blob);
+
+  try {
+    const image =
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+    const canvas =
+      document.createElement("canvas");
+
+    canvas.width = 1650;
+    canvas.height = 930;
+
+    const context =
+      canvas.getContext("2d");
+
+    context.fillStyle =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--panel")
+        .trim() || "#ffffff";
+
+    context.fillRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    context.drawImage(
+      image,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    return canvas.toDataURL(
+      "image/png",
+      0.92
+    );
+  } finally {
+    URL.revokeObjectURL(
+      objectUrl
+    );
+  }
+}
+
+async function generatePdfReport() {
+  const button =
+    $("generatePdf");
+
+  const oldText =
+    button.innerHTML;
+
+  button.disabled = true;
+  button.textContent = "Generating PDF...";
+
+  try {
+    if (
+      !window.jspdf ||
+      !window.jspdf.jsPDF
+    ) {
+      throw new Error(
+        "The PDF library did not load."
+      );
+    }
+
+    const {
+      jsPDF
+    } = window.jspdf;
+
+    const allData =
+      calculateCombinations();
+
+    const visibleData =
+      $("halfLink").checked
+        ? allData
+        : allData.filter(
+            d => !d.isHalfLink
+          );
+
+    const ranked =
+      [...visibleData].sort(
+        (a, b) => {
+          if (
+            a.goldilocks !==
+            b.goldilocks
+          ) {
+            return a.goldilocks
+              ? -1
+              : 1;
+          }
+
+          return a.score - b.score;
+        }
+      );
+
+    const best =
+      ranked[0];
+
+    const goldilocks =
+      ranked.filter(
+        d => d.goldilocks
+      );
+
+    const selectedRings =
+      getSelectedRings();
+
+    const selectedCogs =
+      getSelectedCogs();
+
+    const wheelIn =
+      uiWheelToInches(
+        Number($("wheel").value)
+      );
+
+    const chainstayIn =
+      uiChainstayToInches(
+        Number($("chainstay").value)
+      );
+
+    const dropoutIn =
+      uiDropoutToInches(
+        Number($("dropout").value)
+      );
+
+    const target =
+      Number($("target").value);
+
+    const tolerance =
+      Number($("tolerance").value);
+
+    const doc =
+      new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true
+      });
+
+    // ---------------------------
+    // Page 1: setup and results
+    // ---------------------------
+    setPdfTextColor(doc, "accent");
+    doc.setFont(
+      "helvetica",
+      "bold"
+    );
+    doc.setFontSize(22);
+    doc.text(
+      "CogSmith",
+      14,
+      18
+    );
+
+    setPdfTextColor(doc, "muted");
+    doc.setFont(
+      "helvetica",
+      "normal"
+    );
+    doc.setFontSize(9);
+    doc.text(
+      "Single-speed gearing report",
+      14,
+      24
+    );
+
+    const generated =
+      new Date()
+        .toLocaleString();
+
+    doc.text(
+      `Generated ${generated}`,
+      196,
+      18,
+      { align: "right" }
+    );
+
+    let y = 34;
+
+    y = pdfSectionTitle(
+      doc,
+      "Bike setup",
+      y
+    );
+
+    const unitLabel =
+      unitSystem === "metric"
+        ? "Metric"
+        : "Imperial";
+
+    const wheelValue =
+      unitSystem === "metric"
+        ? `${(wheelIn * IN_TO_MM).toFixed(1)} mm`
+        : `${wheelIn.toFixed(2)} in`;
+
+    const dropoutValue =
+      unitSystem === "metric"
+        ? `+/- ${(dropoutIn * IN_TO_MM).toFixed(1)} mm`
+        : `+/- ${dropoutIn.toFixed(3)} in`;
+
+    pdfKeyValue(
+      doc,
+      "Units",
+      unitLabel,
+      14,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Wheel diameter",
+      wheelValue,
+      60,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Chainstay",
+      pdfChainstayValue(
+        chainstayIn
+      ),
+      106,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Dropout travel",
+      dropoutValue,
+      152,
+      y,
+      44
+    );
+
+    y += 14;
+
+    const ringLines =
+      doc.splitTextToSize(
+        formatToothSelection(
+          selectedRings
+        ),
+        82
+      );
+
+    const cogLines =
+      doc.splitTextToSize(
+        formatToothSelection(
+          selectedCogs
+        ),
+        82
+      );
+
+    setPdfTextColor(doc, "muted");
+    doc.setFont(
+      "helvetica",
+      "normal"
+    );
+    doc.setFontSize(8.5);
+    doc.text(
+      "Selected chainrings",
+      14,
+      y
+    );
+    doc.text(
+      "Selected rear cogs",
+      106,
+      y
+    );
+
+    setPdfTextColor(doc, "text");
+    doc.setFont(
+      "helvetica",
+      "bold"
+    );
+    doc.setFontSize(9);
+    doc.text(
+      ringLines,
+      14,
+      y + 4
+    );
+    doc.text(
+      cogLines,
+      106,
+      y + 4
+    );
+
+    y +=
+      7 +
+      Math.max(
+        ringLines.length,
+        cogLines.length
+      ) * 4;
+
+    pdfKeyValue(
+      doc,
+      "Target gear inches",
+      target.toFixed(1),
+      14,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Gear tolerance",
+      `+/- ${tolerance.toFixed(1)}`,
+      60,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Half-link options",
+      $("halfLink").checked
+        ? "Included"
+        : "Not included",
+      106,
+      y
+    );
+
+    pdfKeyValue(
+      doc,
+      "Combinations tested",
+      String(
+        visibleData.length
+      ),
+      152,
+      y
+    );
+
+    y += 18;
+
+    y = pdfSectionTitle(
+      doc,
+      "Best match",
+      y
+    );
+
+    if (best) {
+      setPdfTextColor(
+        doc,
+        best.isHalfLink
+          ? "gold"
+          : "accent"
+      );
+
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+      doc.setFontSize(18);
+      doc.text(
+        `${best.ring} x ${best.cog}`,
+        14,
+        y + 3
+      );
+
+      setPdfTextColor(
+        doc,
+        "text"
+      );
+      doc.setFontSize(10);
+      doc.text(
+        `${best.gearInches.toFixed(1)} gear inches`,
+        48,
+        y + 3
+      );
+
+      doc.setFontSize(9);
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      doc.text(
+        [
+          `Required chainstay: ${pdfChainstayValue(best.requiredChainstayIn)}`,
+          `Axle shift: ${pdfShiftValue(best.axleShiftIn)}`,
+          `Chain length: ${pdfChainLengthValue(best.chainLength)}`,
+          `Chain type: ${best.isHalfLink ? "Half-link" : "Standard"}`,
+          `Status: ${getStatus(best)}`
+        ],
+        14,
+        y + 10
+      );
+
+      setPdfTextColor(
+        doc,
+        "green"
+      );
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+      doc.setFontSize(10);
+      doc.text(
+        `${goldilocks.length} Goldilocks combination${goldilocks.length === 1 ? "" : "s"} found`,
+        196,
+        y + 3,
+        { align: "right" }
+      );
+    } else {
+      setPdfTextColor(
+        doc,
+        "muted"
+      );
+      doc.setFontSize(10);
+      doc.text(
+        "No combinations are currently selected.",
+        14,
+        y + 3
+      );
+    }
+
+    y += 36;
+
+    y = pdfSectionTitle(
+      doc,
+      "Best combinations",
+      y
+    );
+
+    const rows =
+      ranked.slice(
+        0,
+        15
+      );
+
+    const columns = [
+      { label: "Setup", x: 14 },
+      { label: "GI", x: 39 },
+      { label: "Chainstay", x: 57 },
+      { label: "Axle shift", x: 94 },
+      { label: "Chain", x: 126 },
+      { label: "Type", x: 151 },
+      { label: "Status", x: 174 }
+    ];
+
+    doc.setFillColor(
+      241,
+      243,
+      247
+    );
+    doc.rect(
+      14,
+      y - 4,
+      182,
+      7,
+      "F"
+    );
+
+    setPdfTextColor(
+      doc,
+      "muted"
+    );
+    doc.setFont(
+      "helvetica",
+      "bold"
+    );
+    doc.setFontSize(7.8);
+
+    columns.forEach(
+      column => {
+        doc.text(
+          column.label,
+          column.x,
+          y
+        );
+      }
+    );
+
+    y += 6;
+
+    doc.setFontSize(7.4);
+
+    rows.forEach(
+      (item, index) => {
+        if (
+          index % 2 === 1
+        ) {
+          doc.setFillColor(
+            249,
+            250,
+            252
+          );
+          doc.rect(
+            14,
+            y - 3.5,
+            182,
+            6,
+            "F"
+          );
+        }
+
+        setPdfTextColor(
+          doc,
+          "text"
+        );
+
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+
+        doc.text(
+          `${item.ring} x ${item.cog}`,
+          14,
+          y
+        );
+
+        doc.setFont(
+          "helvetica",
+          "normal"
+        );
+
+        doc.text(
+          item.gearInches.toFixed(1),
+          39,
+          y
+        );
+
+        doc.text(
+          pdfChainstayValue(
+            item.requiredChainstayIn
+          ),
+          57,
+          y
+        );
+
+        doc.text(
+          pdfShiftValue(
+            item.axleShiftIn
+          ),
+          94,
+          y
+        );
+
+        doc.text(
+          pdfChainLengthValue(
+            item.chainLength
+          ),
+          126,
+          y
+        );
+
+        if (
+          item.isHalfLink
+        ) {
+          setPdfTextColor(
+            doc,
+            "gold"
+          );
+        }
+
+        doc.text(
+          item.isHalfLink
+            ? "Half-link"
+            : "Standard",
+          151,
+          y
+        );
+
+        setPdfTextColor(
+          doc,
+          item.goldilocks
+            ? "green"
+            : "text"
+        );
+
+        doc.text(
+          getStatus(item),
+          174,
+          y
+        );
+
+        y += 6;
+      }
+    );
+
+    setPdfTextColor(
+      doc,
+      "muted"
+    );
+    doc.setFont(
+      "helvetica",
+      "normal"
+    );
+    doc.setFontSize(7.5);
+    doc.text(
+      "Goldilocks matches satisfy both the target gear-inch tolerance and the available dropout travel.",
+      14,
+      286
+    );
+
+    // ---------------------------
+    // Page 2: chart
+    // ---------------------------
+    try {
+      const chartImage =
+        await chartToPngDataUrl();
+
+      if (chartImage) {
+        doc.addPage(
+          "a4",
+          "landscape"
+        );
+
+        setPdfTextColor(
+          doc,
+          "text"
+        );
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+        doc.setFontSize(15);
+        doc.text(
+          "Magic gear map",
+          14,
+          15
+        );
+
+        setPdfTextColor(
+          doc,
+          "muted"
+        );
+        doc.setFont(
+          "helvetica",
+          "normal"
+        );
+        doc.setFontSize(8);
+        doc.text(
+          "The chart reflects the current zoom and half-link overlay state.",
+          14,
+          20
+        );
+
+        doc.addImage(
+          chartImage,
+          "PNG",
+          14,
+          26,
+          269,
+          151
+        );
+      }
+    } catch (chartError) {
+      console.warn(
+        "Could not add chart image to PDF:",
+        chartError
+      );
+    }
+
+    // Add page numbers.
+    const pageCount =
+      doc.getNumberOfPages();
+
+    for (
+      let page = 1;
+      page <= pageCount;
+      page++
+    ) {
+      doc.setPage(page);
+
+      setPdfTextColor(
+        doc,
+        "muted"
+      );
+
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      doc.setFontSize(7);
+
+      const pageWidth =
+        doc.internal.pageSize.getWidth();
+
+      const pageHeight =
+        doc.internal.pageSize.getHeight();
+
+      doc.text(
+        `CogSmith - Page ${page} of ${pageCount}`,
+        pageWidth - 14,
+        pageHeight - 7,
+        { align: "right" }
+      );
+    }
+
+    const dateStamp =
+      new Date()
+        .toISOString()
+        .slice(0, 10);
+
+    doc.save(
+      `cogsmith-report-${dateStamp}.pdf`
+    );
+  } catch (error) {
+    console.error(
+      "PDF generation failed:",
+      error
+    );
+
+    alert(
+      "The PDF report could not be generated. Check that the page is online so the PDF library can load, then try again."
+    );
+  } finally {
+    button.disabled = false;
+    button.innerHTML = oldText;
+  }
+}
+
+function update() {
+  const allData =
+    calculateCombinations();
+
+  const visibleData =
+    $("halfLink").checked
+      ? allData
+      : allData.filter(
+          d => !d.isHalfLink
+        );
+
+  renderSummary(
+    visibleData
+  );
+
+  renderChart(
+    allData
+  );
+
+  renderTable(
+    visibleData
+  );
+}
+
+["wheel","chainstay","dropout","target","tolerance","halfLink"].forEach(id => {
+  $(id).addEventListener("input", update);
+  $(id).addEventListener("change", update);
+});
+
+$("metricUnits").addEventListener("click", () => setUnitSystem("metric"));
+$("imperialUnits").addEventListener("click", () => setUnitSystem("imperial"));
+
+function chartZoomBy(factor) {
+  if (
+    !activeChartZoom ||
+    !activeChartSvg
+  ) {
+    return;
+  }
+
+  activeChartSvg
+    .transition()
+    .duration(180)
+    .call(
+      activeChartZoom.scaleBy,
+      factor
+    );
+}
+
+$("zoomIn").addEventListener(
+  "click",
+  () => chartZoomBy(1.5)
+);
+
+$("zoomOut").addEventListener(
+  "click",
+  () => chartZoomBy(1 / 1.5)
+);
+
+$("generatePdf").addEventListener(
+  "click",
+  generatePdfReport
+);
+
+$("zoomReset").addEventListener(
+  "click",
+  () => {
+    if (
+      !activeChartZoom ||
+      !activeChartSvg
+    ) {
+      return;
+    }
+
+    chartZoomTransform =
+      d3.zoomIdentity;
+
+    activeChartSvg
+      .transition()
+      .duration(220)
+      .call(
+        activeChartZoom.transform,
+        d3.zoomIdentity
+      );
+  }
+);
+
+buildRingSelector();
+buildCogSelector();
+update();
+</script>
+</body>
+</html>
