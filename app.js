@@ -418,6 +418,13 @@ function getStatus(item) {
   return "Outside";
 }
 
+function getStatusPriority(item) {
+  if (item.goldilocks) return 0;
+  if (item.dropoutMatch) return 1;
+  if (item.gearMatch) return 2;
+  return 3;
+}
+
 function renderSummary(data) {
   const sorted = [...data].sort((a,b) => a.score - b.score);
   const best = sorted[0];
@@ -444,7 +451,12 @@ function renderSummary(data) {
 }
 
 function renderTable(data) {
-  const rows = [...data].sort((a,b) => a.score - b.score).slice(0,25);
+  const rows = [...data]
+    .sort((a, b) =>
+      getStatusPriority(a) - getStatusPriority(b) ||
+      a.score - b.score
+    )
+    .slice(0,25);
 
   $("results").innerHTML = rows.map(item => {
     const badgeClass = item.goldilocks ? "gold" : item.dropoutMatch ? "fit" : "other";
@@ -452,6 +464,7 @@ function renderTable(data) {
     return `
       <tr>
         <td><strong>${item.ring} × ${item.cog}</strong></td>
+        <td><span class="badge ${badgeClass}">${getStatus(item)}</span></td>
         <td>${item.gearInches.toFixed(1)}"</td>
         <td>${formatChainstay(item.requiredChainstayIn)}</td>
         <td>${formatShift(item.axleShiftIn)}</td>
@@ -459,7 +472,6 @@ function renderTable(data) {
           ${formatChainLength(item.chainLength)}
           ${item.isHalfLink ? '<span class="badge half-link-badge">½-link</span>' : ''}
         </td>
-        <td><span class="badge ${badgeClass}">${getStatus(item)}</span></td>
       </tr>
     `;
   }).join("");
