@@ -422,35 +422,59 @@ function discreteChainPath(chainring, cog, chainstay) {
   return maximumPath;
 }
 
-function chainPathForRounding(chainring, cog, chainstay) {
+function chainGeometryForRounding(chainring, cog, chainstay) {
   const fastPath = chainPath(chainring, cog, chainstay);
 
   if (!Number.isFinite(fastPath)) {
-    return fastPath;
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
   }
 
   const boundaryDistance =
     Math.abs(fastPath * 2 - Math.round(fastPath * 2)) / 2;
 
   if (boundaryDistance > ROUNDING_BOUNDARY_TOLERANCE_IN) {
-    return fastPath;
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
   }
 
   const exactPath =
     discreteChainPath(chainring, cog, chainstay);
 
-  return Number.isFinite(exactPath)
-    ? exactPath
-    : fastPath;
+  if (!Number.isFinite(exactPath)) {
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
+  }
+
+  return {
+    path: exactPath,
+    pathCalculator: discreteChainPath
+  };
 }
 
-function solveChainstay(chainring, cog, chainLength, approximateChainstay) {
+function solveChainstay(
+  chainring,
+  cog,
+  chainLength,
+  approximateChainstay,
+  pathCalculator = chainPath
+) {
   let low = Math.max(2, approximateChainstay - 5);
   let high = approximateChainstay + 5;
+  // Twenty bisections resolve the 10-inch discrete search window to well
+  // below 0.001 mm without repeating the expensive polygon path 90 times.
+  const iterations =
+    pathCalculator === discreteChainPath ? 20 : 90;
 
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < iterations; i++) {
     const midpoint = (low + high) / 2;
-    const path = chainPath(chainring, cog, midpoint);
+    const path = pathCalculator(chainring, cog, midpoint);
     if (!Number.isFinite(path) || path < chainLength) low = midpoint;
     else high = midpoint;
   }
@@ -469,9 +493,22 @@ function calculateCombinations() {
 
   const combinations = [];
 
-  function addSolution(ring, cog, gearInches, chainLength, isHalfLink) {
+  function addSolution(
+    ring,
+    cog,
+    gearInches,
+    chainLength,
+    isHalfLink,
+    pathCalculator
+  ) {
     const requiredChainstayIn =
-      solveChainstay(ring, cog, chainLength, chainstayIn);
+      solveChainstay(
+        ring,
+        cog,
+        chainLength,
+        chainstayIn,
+        pathCalculator
+      );
 
     const axleShiftIn =
       requiredChainstayIn - chainstayIn;
@@ -517,8 +554,10 @@ function calculateCombinations() {
       const gearInches =
         wheel * ring / cog;
 
+      const chainGeometry =
+        chainGeometryForRounding(ring, cog, chainstayIn);
       const theoreticalChain =
-        chainPathForRounding(ring, cog, chainstayIn);
+        chainGeometry.path;
 
       if (!Number.isFinite(theoreticalChain)) {
         continue;
@@ -536,7 +575,8 @@ function calculateCombinations() {
         cog,
         gearInches,
         standardChainLength,
-        false
+        false,
+        chainGeometry.pathCalculator
       );
 
       /*
@@ -552,7 +592,8 @@ function calculateCombinations() {
         cog,
         gearInches,
         halfLinkChainLength,
-        true
+        true,
+        chainGeometry.pathCalculator
       );
     }
   }
