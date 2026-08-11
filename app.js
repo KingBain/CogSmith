@@ -279,6 +279,19 @@ function sprocketRadius(teeth) {
   return teeth / (4 * Math.PI);
 }
 
+const CHAIN_PITCH_IN = 0.5;
+const CHAIN_PHASE_SAMPLES = 32;
+const GEOMETRY_EPSILON = 1e-12;
+
+/*
+ * Standard-chain rounding changes at x.5 inches, while half-link rounding
+ * changes at whole inches. The belt and polygon paths stayed within 0.007
+ * inches across CogSmith's selectable tooth counts and 8–24 inch chainstays,
+ * so a 0.01-inch window safely identifies every result that needs the more
+ * exact rounding check.
+ */
+const ROUNDING_BOUNDARY_TOLERANCE_IN = 0.01;
+
 function chainPath(chainring, cog, chainstay) {
   const ringRadius = sprocketRadius(chainring);
   const cogRadius = sprocketRadius(cog);
@@ -295,13 +308,173 @@ function chainPath(chainring, cog, chainstay) {
   ) / 90;
 }
 
-function solveChainstay(chainring, cog, chainLength, approximateChainstay) {
+function sprocketPitchRadius(teeth) {
+  return CHAIN_PITCH_IN /
+    (2 * Math.sin(Math.PI / teeth));
+}
+
+function buildPitchPolygon(teeth, centerX, phase) {
+  const radius = sprocketPitchRadius(teeth);
+  const points = [];
+
+  for (let tooth = 0; tooth < teeth; tooth++) {
+    const angle = phase + tooth * 2 * Math.PI / teeth;
+    points.push({
+      x: centerX + radius * Math.cos(angle),
+      y: radius * Math.sin(angle)
+    });
+  }
+
+  return points;
+}
+
+function geometryCross(origin, a, b) {
+  return (
+    (a.x - origin.x) * (b.y - origin.y) -
+    (a.y - origin.y) * (b.x - origin.x)
+  );
+}
+
+function convexHull(points) {
+  const sorted = [...points].sort((a, b) =>
+    a.x === b.x ? a.y - b.y : a.x - b.x
+  );
+  const lower = [];
+  const upper = [];
+
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      geometryCross(
+        lower[lower.length - 2],
+        lower[lower.length - 1],
+        point
+      ) <= GEOMETRY_EPSILON
+    ) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+
+  for (let index = sorted.length - 1; index >= 0; index--) {
+    const point = sorted[index];
+    while (
+      upper.length >= 2 &&
+      geometryCross(
+        upper[upper.length - 2],
+        upper[upper.length - 1],
+        point
+      ) <= GEOMETRY_EPSILON
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function polygonChainPathForPhase(
+  chainring,
+  cog,
+  chainstay,
+  phaseFraction
+) {
+  const ringPhase =
+    phaseFraction * 2 * Math.PI / chainring;
+  const cogPhase =
+    phaseFraction * 2 * Math.PI / cog;
+  const hull = convexHull([
+    ...buildPitchPolygon(chainring, 0, ringPhase),
+    ...buildPitchPolygon(cog, chainstay, cogPhase)
+  ]);
+
+  let pathLength = 0;
+  for (let index = 0; index < hull.length; index++) {
+    const current = hull[index];
+    const next = hull[(index + 1) % hull.length];
+    pathLength += Math.hypot(
+      next.x - current.x,
+      next.y - current.y
+    );
+  }
+
+  return pathLength;
+}
+
+function discreteChainPath(chainring, cog, chainstay) {
+  let maximumPath = -Infinity;
+
+  for (let sample = 0; sample < CHAIN_PHASE_SAMPLES; sample++) {
+    maximumPath = Math.max(
+      maximumPath,
+      polygonChainPathForPhase(
+        chainring,
+        cog,
+        chainstay,
+        sample / CHAIN_PHASE_SAMPLES
+      )
+    );
+  }
+
+  return maximumPath;
+}
+
+function chainGeometryForRounding(chainring, cog, chainstay) {
+  const fastPath = chainPath(chainring, cog, chainstay);
+
+  if (!Number.isFinite(fastPath)) {
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
+  }
+
+  const boundaryDistance =
+    Math.abs(fastPath * 2 - Math.round(fastPath * 2)) / 2;
+
+  if (boundaryDistance > ROUNDING_BOUNDARY_TOLERANCE_IN) {
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
+  }
+
+  const exactPath =
+    discreteChainPath(chainring, cog, chainstay);
+
+  if (!Number.isFinite(exactPath)) {
+    return {
+      path: fastPath,
+      pathCalculator: chainPath
+    };
+  }
+
+  return {
+    path: exactPath,
+    pathCalculator: discreteChainPath
+  };
+}
+
+function solveChainstay(
+  chainring,
+  cog,
+  chainLength,
+  approximateChainstay,
+  pathCalculator = chainPath
+) {
   let low = Math.max(2, approximateChainstay - 5);
   let high = approximateChainstay + 5;
+  // Twenty bisections resolve the 10-inch discrete search window to well
+  // below 0.001 mm without repeating the expensive polygon path 90 times.
+  const iterations =
+    pathCalculator === discreteChainPath ? 20 : 90;
 
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < iterations; i++) {
     const midpoint = (low + high) / 2;
-    const path = chainPath(chainring, cog, midpoint);
+    const path = pathCalculator(chainring, cog, midpoint);
     if (!Number.isFinite(path) || path < chainLength) low = midpoint;
     else high = midpoint;
   }
@@ -320,9 +493,22 @@ function calculateCombinations() {
 
   const combinations = [];
 
-  function addSolution(ring, cog, gearInches, chainLength, isHalfLink) {
+  function addSolution(
+    ring,
+    cog,
+    gearInches,
+    chainLength,
+    isHalfLink,
+    pathCalculator
+  ) {
     const requiredChainstayIn =
-      solveChainstay(ring, cog, chainLength, chainstayIn);
+      solveChainstay(
+        ring,
+        cog,
+        chainLength,
+        chainstayIn,
+        pathCalculator
+      );
 
     const axleShiftIn =
       requiredChainstayIn - chainstayIn;
@@ -368,8 +554,10 @@ function calculateCombinations() {
       const gearInches =
         wheel * ring / cog;
 
+      const chainGeometry =
+        chainGeometryForRounding(ring, cog, chainstayIn);
       const theoreticalChain =
-        chainPath(ring, cog, chainstayIn);
+        chainGeometry.path;
 
       if (!Number.isFinite(theoreticalChain)) {
         continue;
@@ -387,7 +575,8 @@ function calculateCombinations() {
         cog,
         gearInches,
         standardChainLength,
-        false
+        false,
+        chainGeometry.pathCalculator
       );
 
       /*
@@ -403,7 +592,8 @@ function calculateCombinations() {
         cog,
         gearInches,
         halfLinkChainLength,
-        true
+        true,
+        chainGeometry.pathCalculator
       );
     }
   }
@@ -425,8 +615,15 @@ function getStatusPriority(item) {
   return 3;
 }
 
+function compareCombinations(a, b) {
+  return (
+    getStatusPriority(a) - getStatusPriority(b) ||
+    a.score - b.score
+  );
+}
+
 function renderSummary(data) {
-  const sorted = [...data].sort((a,b) => a.score - b.score);
+  const sorted = [...data].sort(compareCombinations);
   const best = sorted[0];
 
   if (!best) {
@@ -452,10 +649,7 @@ function renderSummary(data) {
 
 function renderTable(data) {
   const rows = [...data]
-    .sort((a, b) =>
-      getStatusPriority(a) - getStatusPriority(b) ||
-      a.score - b.score
-    )
+    .sort(compareCombinations)
     .slice(0,25);
 
   $("results").innerHTML = rows.map(item => {
@@ -1443,18 +1637,7 @@ async function generatePdfReport() {
 
     const ranked =
       [...visibleData].sort(
-        (a, b) => {
-          if (
-            a.goldilocks !==
-            b.goldilocks
-          ) {
-            return a.goldilocks
-              ? -1
-              : 1;
-          }
-
-          return a.score - b.score;
-        }
+        compareCombinations
       );
 
     const best =
