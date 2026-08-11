@@ -1,0 +1,62 @@
+name: Visual review
+
+on:
+  pull_request:
+    paths:
+      - "app.js"
+      - "index.html"
+      - "styles.css"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/capture-visual-review.mjs"
+      - ".github/workflows/visual-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Generate before and after screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check out main branch version
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .visual-review/base
+
+      - name: Install screenshot dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture visual comparison
+        run: node scripts/capture-visual-review.mjs .visual-review/base .
+
+      - name: Upload visual review
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cogsmith-visual-review
+          path: visual-review/
+          retention-days: 14
+
+      - name: Add workflow summary
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            echo "## CogSmith visual review"
+            echo
+            echo "Desktop and mobile before/after screenshots are ready."
+            echo
+            echo "[Download the visual review report](${ARTIFACT_URL})"
+            echo
+            echo "Extract the artifact and open \`index.html\` to view the side-by-side report."
+          } >> "$GITHUB_STEP_SUMMARY"
