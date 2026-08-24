@@ -618,6 +618,7 @@ function getStatusPriority(item) {
 function compareCombinations(a, b) {
   return (
     getStatusPriority(a) - getStatusPriority(b) ||
+    a.gearError - b.gearError ||
     a.score - b.score
   );
 }
