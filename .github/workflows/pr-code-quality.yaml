@@ -74,9 +74,18 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
 
-          curl --fail             --retry 10             --retry-connrefused             --retry-delay 1             http://127.0.0.1:4173/ > /dev/null
+          curl --fail \
+            --retry 10 \
+            --retry-connrefused \
+            --retry-delay 1 \
+            http://127.0.0.1:4173/ > /dev/null
 
-          npx --yes webmcp-evals@0.0.4 smoke             --url http://127.0.0.1:4173/             --evals test/webmcp-smoke.json             --chrome-channel chrome             --timeout 60000             --verbose
+          npx --yes webmcp-evals@0.0.4 smoke \
+            --url http://127.0.0.1:4173/ \
+            --evals test/webmcp-smoke.json \
+            --chrome-channel chrome \
+            --timeout 60000 \
+            --verbose
 
   browser-validation:
     name: Test application and generate screenshots
