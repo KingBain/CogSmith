@@ -1,10 +1,12 @@
-const CACHE_NAME = "cogsmith-v3";
+const CACHE_NAME = "cogsmith-v4";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./src/core/calculator.js",
+  "./src/core/chain-geometry.js",
   "./manifest.webmanifest",
   "./icons/cogsmith-icon.svg",
   "./icons/cogsmith-icon-192.png",
