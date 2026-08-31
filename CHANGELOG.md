@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/KingBain/CogSmith/compare/v0.1.1...v0.2.0) (2026-08-31)
+
+
+### Features
+
+* expose calculator tools through WebMCP ([#16](https://github.com/KingBain/CogSmith/issues/16)) ([177d41c](https://github.com/KingBain/CogSmith/commit/177d41c2550eb9ad8b5d90d67ebd396708543b0e))
+
 ## [0.1.1](https://github.com/KingBain/CogSmith/compare/v0.1.0...v0.1.1) (2026-08-31)
 
 
