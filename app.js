@@ -2321,6 +2321,92 @@ $("generatePdf").addEventListener(
   generatePdfReport
 );
 
+let deferredInstallPrompt = null;
+
+function isInstalledApp() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function isIosDevice() {
+  return (
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent) ||
+    (window.navigator.platform === "MacIntel" &&
+      window.navigator.maxTouchPoints > 1)
+  );
+}
+
+function showInstallHelp(message) {
+  const help = $("installAppHelp");
+  help.textContent = message;
+  help.hidden = false;
+}
+
+async function installCogSmith() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+
+    const { outcome } =
+      await deferredInstallPrompt.userChoice;
+
+    deferredInstallPrompt = null;
+
+    if (outcome === "dismissed") {
+      showInstallHelp(
+        "Installation was dismissed. You can try again from your browser menu."
+      );
+    }
+
+    return;
+  }
+
+  if (isIosDevice()) {
+    showInstallHelp(
+      "On iPhone or iPad, tap the Share button, then choose Add to Home Screen."
+    );
+    return;
+  }
+
+  showInstallHelp(
+    "Open your browser menu and choose Install app or Add to Home screen."
+  );
+}
+
+function setupInstallExperience() {
+  const installApp = $("installApp");
+  const installButton = $("installAppButton");
+
+  if (isInstalledApp()) {
+    installApp.hidden = true;
+    return;
+  }
+
+  installButton.addEventListener("click", installCogSmith);
+
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    $("installAppHelp").hidden = true;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    installApp.hidden = true;
+  });
+
+  if ("serviceWorker" in window.navigator) {
+    window.addEventListener("load", () => {
+      window.navigator.serviceWorker
+        .register("./sw.js", { scope: "./" })
+        .catch(error => {
+          console.warn("CogSmith service worker registration failed:", error);
+        });
+    });
+  }
+}
+
 $("zoomReset").addEventListener(
   "click",
   () => {
@@ -2347,3 +2433,4 @@ $("zoomReset").addEventListener(
 buildRingSelector();
 buildCogSelector();
 update();
+setupInstallExperience();

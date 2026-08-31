@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CogSmith sprocket logo">
+  <defs>
+    <linearGradient id="background" x1="72" y1="40" x2="440" y2="472" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9b72ff"></stop>
+      <stop offset="1" stop-color="#5b21b6"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#background)"></rect>
+  <circle cx="256" cy="256" r="151" fill="none" stroke="#ffffff" stroke-width="42" stroke-dasharray="22 12"></circle>
+  <circle cx="256" cy="256" r="104" fill="#6d28d9" stroke="#ffffff" stroke-width="26"></circle>
+  <circle cx="256" cy="256" r="32" fill="#ffffff"></circle>
+  <circle cx="256" cy="154" r="13" fill="#ffffff"></circle>
+  <circle cx="358" cy="256" r="13" fill="#ffffff"></circle>
+  <circle cx="256" cy="358" r="13" fill="#ffffff"></circle>
+  <circle cx="154" cy="256" r="13" fill="#ffffff"></circle>
+</svg>
