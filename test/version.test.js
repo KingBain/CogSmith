@@ -17,6 +17,22 @@ test("the application version uses stable semantic versioning", () => {
   assert.equal(Object.isFrozen(globalThis.COGSMITH_VERSION), true);
 });
 
+test("Release Please owns the canonical application version", async () => {
+  const [versionSource, configSource, manifestSource] = await Promise.all([
+    readFile(new URL("../version.js", import.meta.url), "utf8"),
+    readFile(new URL("../release-please-config.json", import.meta.url), "utf8"),
+    readFile(new URL("../.release-please-manifest.json", import.meta.url), "utf8"),
+  ]);
+  const config = JSON.parse(configSource);
+  const manifest = JSON.parse(manifestSource);
+
+  assert.match(versionSource, /x-release-please-version/);
+  assert.deepEqual(config.packages["."].extraFiles ?? config.packages["."]["extra-files"], [
+    { type: "generic", path: "version.js" },
+  ]);
+  assert.match(manifest["."], /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+});
+
 test("deployment stamping replaces the cache build identifier", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "cogsmith-version-"));
   const versionFile = join(directory, "version.js");
