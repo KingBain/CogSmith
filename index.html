@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CogSmith — Single-Speed Calculator</title>
+  <meta name="description" content="Find single-speed gearing that fits your bike, your chain, and your legs.">
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CogSmith">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/cogsmith-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/cogsmith-icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@4.0.0/dist/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="styles.css">
@@ -210,6 +218,24 @@
       Generate PDF report
     </button>
   </footer>
+
+  <section id="installApp" class="install-app" aria-labelledby="installAppTitle">
+    <div class="install-app-copy">
+      <span class="install-app-eyebrow">Mobile app</span>
+      <strong id="installAppTitle">Keep CogSmith in your toolbox</strong>
+      <span id="installAppDescription">Install it on your home screen for quick access at the bike stand or parts bin.</span>
+    </div>
+
+    <button id="installAppButton" class="report-button install-app-button" type="button"
+      aria-describedby="installAppDescription installAppHelp">
+      <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path>
+      </svg>
+      <span id="installAppButtonLabel">Install CogSmith</span>
+    </button>
+
+    <p id="installAppHelp" class="install-app-help" role="status" aria-live="polite" hidden></p>
+  </section>
 
   <footer class="site-footer">
     <span>CogSmith is open source.</span>

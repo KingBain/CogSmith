@@ -75,6 +75,60 @@ h2{margin:0 0 14px;font-size:1.15rem}
   color:var(--muted);
   font-size:.82rem;
 }
+.install-app{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px 20px;
+  margin-top:14px;
+  padding:18px 20px;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,var(--border));
+  border-radius:14px;
+  background:linear-gradient(135deg,var(--accentSoft),var(--panel));
+}
+.install-app-copy{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  min-width:0;
+}
+.install-app-eyebrow{
+  color:var(--accent);
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.install-app-copy strong{
+  color:var(--text);
+  font-size:.95rem;
+}
+.install-app-copy > span:last-child{
+  color:var(--muted);
+  font-size:.82rem;
+}
+.install-app-button{
+  justify-content:center;
+}
+.install-icon{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  stroke-width:2;
+}
+.install-app-help{
+  grid-column:1 / -1;
+  margin:0;
+  padding-top:10px;
+  border-top:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));
+  color:var(--text);
+  font-size:.82rem;
+  line-height:1.45;
+}
+[hidden]{display:none !important}
 .site-footer{
   display:flex;
   align-items:center;
@@ -113,6 +167,16 @@ h2{margin:0 0 14px;font-size:1.15rem}
   .report-footer .report-button{
     width:100%;
     justify-content:center;
+  }
+  .install-app{
+    grid-template-columns:1fr;
+    align-items:stretch;
+  }
+  .install-app-button{
+    width:100%;
+  }
+  .install-app-help{
+    grid-column:1;
   }
 }
 .panel{margin-top:22px;padding:20px;background:var(--panel);border:1px solid var(--border);border-radius:16px}
