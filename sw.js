@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./styles.css",
   "./app.js",
   "./version.js",
+  "./src/webmcp.js",
   "./src/core/calculator.js",
   "./src/core/chain-geometry.js",
   "./manifest.webmanifest",

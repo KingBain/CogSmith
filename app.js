@@ -3,6 +3,7 @@ import {
   compareCombinations,
   getStatus
 } from "./src/core/calculator.js";
+import { registerCogSmithWebMcp } from "./src/webmcp.js";
 
 const $ = id => document.getElementById(id);
 
@@ -304,6 +305,56 @@ function calculateCombinations() {
     targetGearInches: Number($("target").value),
     gearTolerance: Number($("tolerance").value),
     dropoutTravelIn: uiDropoutToInches(Number($("dropout").value))
+  });
+}
+
+function readCurrentBikeSetup() {
+  return {
+    units: unitSystem,
+    chainrings: getSelectedRings(),
+    rearCogs: getSelectedCogs(),
+    wheelDiameter: Number($("wheel").value),
+    chainstayLength: Number($("chainstay").value),
+    dropoutTravel: Number($("dropout").value),
+    targetGearInches: Number($("target").value),
+    gearTolerance: Number($("tolerance").value),
+    includeHalfLink: $("halfLink").checked
+  };
+}
+
+function setSelectedToothCounts(selector, toothCounts) {
+  const selected = new Set(toothCounts);
+
+  document.querySelectorAll(selector).forEach(checkbox => {
+    checkbox.checked = selected.has(Number(checkbox.value));
+  });
+}
+
+function applyBikeSetup(setup) {
+  setUnitSystem(setup.units);
+
+  $("wheel").value = setup.wheelDiameter;
+  $("chainstay").value = setup.chainstayLength;
+  $("dropout").value = setup.dropoutTravel;
+  $("target").value = setup.targetGearInches;
+  $("tolerance").value = setup.gearTolerance;
+  $("halfLink").checked = setup.includeHalfLink;
+
+  setSelectedToothCounts(".ring-checkbox", setup.chainrings);
+  setSelectedToothCounts(".cog-checkbox", setup.rearCogs);
+  updateRingSummary();
+  updateCogSummary();
+
+  selectedChartKey = null;
+  update();
+}
+
+function setupWebMcp() {
+  registerCogSmithWebMcp({
+    readCurrentSetup: readCurrentBikeSetup,
+    applySetup: applyBikeSetup
+  }).catch(error => {
+    console.warn("CogSmith WebMCP setup failed:", error);
   });
 }
 
@@ -2671,3 +2722,4 @@ buildCogSelector();
 renderAppVersion();
 update();
 setupInstallExperience();
+setupWebMcp();

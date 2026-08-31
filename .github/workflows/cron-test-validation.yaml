@@ -33,7 +33,7 @@ jobs:
         run: npm run check
 
   unit-tests:
-    name: Test calculator engine
+    name: Test application modules
     runs-on: ubuntu-latest
     steps:
       - name: Check out main
