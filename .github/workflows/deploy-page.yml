@@ -1,46 +1,45 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Reusable workflow for deploying a released version to GitHub Pages
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
+  workflow_call:
+    inputs:
+      release_sha:
+        description: Commit SHA tagged by Release Please
+        required: true
+        type: string
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+permissions: {}
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
-      - name: Checkout
+      - name: Check out released commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
       - name: Stamp deployment metadata
         env:
-          COGSMITH_BUILD_ID: ${{ github.sha }}
+          COGSMITH_BUILD_ID: ${{ inputs.release_sha }}
         run: npm run stamp-build -- "$COGSMITH_BUILD_ID"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
