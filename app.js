@@ -6,6 +6,15 @@ import {
 
 const $ = id => document.getElementById(id);
 
+const VERSION_INFO = globalThis.COGSMITH_VERSION;
+const APP_VERSION = VERSION_INFO.version;
+const APP_BUILD = VERSION_INFO.build.startsWith("__")
+  ? "local"
+  : VERSION_INFO.build;
+const APP_VERSION_LABEL = `CogSmith v${APP_VERSION}`;
+const APP_BUILD_LABEL = `${APP_VERSION_LABEL} · build ${APP_BUILD}`;
+const RELEASES_URL = "https://github.com/KingBain/CogSmith/releases";
+
 let unitSystem = "metric";
 
 const IN_TO_MM = 25.4;
@@ -63,6 +72,13 @@ function formatChainLength(inches) {
   return Number.isInteger(inches)
     ? `${inches.toFixed(0)} in`
     : `${inches.toFixed(1)} in`;
+}
+
+function renderAppVersion() {
+  const versionLink = $("appVersion");
+  versionLink.textContent = APP_VERSION_LABEL;
+  versionLink.href = `${RELEASES_URL}/tag/v${APP_VERSION}`;
+  versionLink.title = `Build ${APP_BUILD}`;
 }
 
 function setUnitSystem(next) {
@@ -2427,7 +2443,7 @@ async function generatePdfReport() {
         doc.internal.pageSize.getHeight();
 
       doc.text(
-        `CogSmith - Page ${page} of ${pageCount}`,
+        `${APP_BUILD_LABEL} - Page ${page} of ${pageCount}`,
         pageWidth - 14,
         pageHeight - 7,
         { align: "right" }
@@ -2616,7 +2632,10 @@ function setupInstallExperience() {
   if ("serviceWorker" in window.navigator) {
     window.addEventListener("load", () => {
       window.navigator.serviceWorker
-        .register("./sw.js", { scope: "./" })
+        .register("./sw.js", {
+          scope: "./",
+          updateViaCache: "none"
+        })
         .catch(error => {
           console.warn("CogSmith service worker registration failed:", error);
         });
@@ -2649,5 +2668,6 @@ $("zoomReset").addEventListener(
 
 buildRingSelector();
 buildCogSelector();
+renderAppVersion();
 update();
 setupInstallExperience();

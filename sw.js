@@ -1,10 +1,17 @@
-const CACHE_NAME = "cogsmith-v4";
+importScripts("./version.js");
+
+const VERSION_INFO = self.COGSMITH_VERSION;
+const BUILD_ID = VERSION_INFO.build.startsWith("__")
+  ? "local"
+  : VERSION_INFO.build;
+const CACHE_NAME = `cogsmith-v${VERSION_INFO.version}-${BUILD_ID}`;
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./version.js",
   "./src/core/calculator.js",
   "./src/core/chain-geometry.js",
   "./manifest.webmanifest",

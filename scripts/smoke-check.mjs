@@ -4,7 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { chromium } from "playwright";
 
+import "../version.js";
+
 const siteDirectory = resolve(".");
+const expectedVersion = globalThis.COGSMITH_VERSION.version;
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -51,6 +54,17 @@ try {
 
   assert.equal(response?.status(), 200, "The application should load successfully");
   await page.locator("#results tr").first().waitFor();
+
+  assert.equal(
+    (await page.locator("#appVersion").textContent())?.trim(),
+    `CogSmith v${expectedVersion}`,
+    "The site footer should display the application version"
+  );
+  assert.equal(
+    await page.locator("#appVersion").getAttribute("href"),
+    `https://github.com/KingBain/CogSmith/releases/tag/v${expectedVersion}`,
+    "The footer version should link to its GitHub release"
+  );
 
   const bestCombination = (await page.locator("#bestCombo").textContent())?.trim();
   assert.match(
