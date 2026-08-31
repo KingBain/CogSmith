@@ -4,6 +4,7 @@
   --accent:#7c3aed; --accentSoft:#eee8ff; --good:#138a53; --goodSoft:#e2f7ec;
   --halfLink:#9a6a00; --halfLinkSoft:#f5ebc8;
   --point:#687386; --shadow:0 12px 30px rgba(0,0,0,.08);
+  --page-gutter:max(20px,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px));
 }
 @media(prefers-color-scheme:dark){
   :root{
@@ -14,8 +15,9 @@
   }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{max-width:1220px;margin:auto;padding:30px 20px 56px}
+html,body{width:100%;min-width:0}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{width:100%;max-width:1220px;margin-inline:auto;padding:30px var(--page-gutter) 56px}
 h1{margin:0;font-size:2.15rem;letter-spacing:-.03em}
 h2{margin:0 0 14px;font-size:1.15rem}
 .subtitle{margin-top:6px;color:var(--muted)}
@@ -151,33 +153,6 @@ h2{margin:0 0 14px;font-size:1.15rem}
 }
 .site-footer-separator{
   color:var(--border);
-}
-@media(max-width:640px){
-  .unit-controls{
-    width:100%;
-    justify-content:space-between;
-  }
-  .unit-copy{
-    text-align:left;
-    flex:1 1 180px;
-  }
-  .report-footer{
-    align-items:stretch;
-  }
-  .report-footer .report-button{
-    width:100%;
-    justify-content:center;
-  }
-  .install-app{
-    grid-template-columns:1fr;
-    align-items:stretch;
-  }
-  .install-app-button{
-    width:100%;
-  }
-  .install-app-help{
-    grid-column:1;
-  }
 }
 .panel{margin-top:22px;padding:20px;background:var(--panel);border:1px solid var(--border);border-radius:16px}
 .unit-row{
@@ -518,4 +493,64 @@ th{font-size:.78rem;color:var(--muted)}
 }
 .half-link-text{
   color:var(--halfLink);
+}
+
+@media(max-width:640px){
+  :root{
+    --page-gutter:max(16px,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px));
+  }
+  main{
+    max-width:none;
+    padding-top:24px;
+  }
+  .panel{
+    width:100%;
+    min-width:0;
+    padding:18px;
+  }
+  .unit-row{
+    align-items:stretch;
+  }
+  .unit-controls{
+    width:100%;
+    min-width:0;
+    margin-left:0;
+    justify-content:center;
+  }
+  .unit-copy{
+    width:100%;
+    flex:1 1 100%;
+    text-align:center;
+  }
+  .unit-toggle{
+    margin-inline:auto;
+  }
+  .inputs{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .inputs > *{
+    width:100%;
+    min-width:0;
+  }
+  .menu{
+    width:100%;
+    max-width:100%;
+  }
+  .report-footer{
+    align-items:stretch;
+  }
+  .report-footer .report-button{
+    width:100%;
+    justify-content:center;
+  }
+  .install-app{
+    grid-template-columns:1fr;
+    align-items:stretch;
+  }
+  .install-app-button{
+    width:100%;
+  }
+  .install-app-help{
+    grid-column:1;
+  }
 }
