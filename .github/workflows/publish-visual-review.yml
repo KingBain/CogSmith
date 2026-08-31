@@ -2,7 +2,7 @@ name: Publish visual review comment
 
 on:
   workflow_run:
-    workflows: ["Visual review"]
+    workflows: ["Pull request code quality"]
     types: [completed]
 
 permissions:
