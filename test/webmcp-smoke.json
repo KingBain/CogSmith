@@ -1,0 +1,71 @@
+[
+  {
+    "name": "Read the current CogSmith setup",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Read the bike setup currently displayed."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_current_bike_setup",
+        "arguments": {}
+      }
+    ]
+  },
+  {
+    "name": "Calculate a known gearing setup",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Calculate gearing options for this bike."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "calculate_gearing_options",
+        "arguments": {
+          "units": "metric",
+          "chainrings": [38],
+          "rearCogs": [18],
+          "wheelDiameter": 660.4,
+          "chainstayLength": 423,
+          "dropoutTravel": 10,
+          "targetGearInches": 55,
+          "gearTolerance": 2,
+          "includeHalfLink": true,
+          "maxResults": 2
+        }
+      }
+    ]
+  },
+  {
+    "name": "Update the visible CogSmith setup",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Display this gearing setup in CogSmith."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "show_gearing_setup",
+        "arguments": {
+          "units": "metric",
+          "chainrings": [38],
+          "rearCogs": [18],
+          "wheelDiameter": 660.4,
+          "chainstayLength": 423,
+          "dropoutTravel": 10,
+          "targetGearInches": 55,
+          "gearTolerance": 2,
+          "includeHalfLink": true
+        }
+      }
+    ]
+  }
+]

@@ -49,6 +49,44 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+  webmcp-validation:
+    name: Test native WebMCP integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Show Chrome version
+        run: google-chrome --version
+
+      - name: Run native WebMCP smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/cogsmith-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+
+          curl --fail \
+            --retry 10 \
+            --retry-connrefused \
+            --retry-delay 1 \
+            http://127.0.0.1:4173/ > /dev/null
+
+          npx --yes webmcp-evals@0.0.4 smoke \
+            --url http://127.0.0.1:4173/ \
+            --evals test/webmcp-smoke.json \
+            --chrome-channel chrome \
+            --timeout 60000 \
+            --verbose
+
   browser-validation:
     name: Test application and generate screenshots
     runs-on: ubuntu-latest
