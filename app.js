@@ -10,6 +10,9 @@ const IN_TO_CM = 2.54;
 let chartZoomTransform = d3.zoomIdentity;
 let activeChartZoom = null;
 let activeChartSvg = null;
+let selectedChartKey = null;
+let lastChartLayoutKey = null;
+let chartExpanded = false;
 
 function uiWheelToInches(value) {
   return unitSystem === "metric" ? value / IN_TO_MM : value;
@@ -264,6 +267,10 @@ document.addEventListener("keydown", event => {
   if (event.key === "Escape") {
     closeRingMenu();
     closeCogMenu();
+
+    if (chartExpanded) {
+      setChartExpanded(false);
+    }
   }
 });
 
@@ -622,6 +629,227 @@ function compareCombinations(a, b) {
   );
 }
 
+function getChartLayout({ forceDesktop = false } = {}) {
+  const desktopLayout = {
+    key: "desktop",
+    width: 1100,
+    height: 620,
+    margin: {
+      top: 25,
+      right: 35,
+      bottom: 65,
+      left: 75
+    },
+    tickCount: 10,
+    tickFontSize: 10,
+    axisTitleFontSize: 16,
+    yAxisTitleOffset: 20,
+    labelFontSize: 10,
+    goldRadius: 6,
+    standardRadius: 3.5,
+    standardRelevantRadius: 3.5,
+    halfRadius: 4.3,
+    halfRelevantRadius: 4.3,
+    hoverRadius: 7,
+    hitRadius: 12,
+    selectionPadding: 4,
+    labelX: 8,
+    standardLabelY: -7,
+    halfLabelY: 12
+  };
+
+  if (forceDesktop) {
+    return {
+      ...desktopLayout,
+      key: "desktop-export"
+    };
+  }
+
+  const standalone =
+    window.matchMedia(
+      "(display-mode: standalone)"
+    ).matches;
+
+  const compactViewport =
+    window.matchMedia(
+      "(max-width: 640px)"
+    ).matches ||
+    (
+      standalone &&
+      window.innerWidth <= 900
+    );
+
+  const portrait =
+    window.innerHeight >=
+    window.innerWidth;
+
+  if (
+    chartExpanded &&
+    !portrait
+  ) {
+    return {
+      ...desktopLayout,
+      key: "expanded-landscape",
+      tickCount: 7,
+      tickFontSize: 14,
+      axisTitleFontSize: 18,
+      yAxisTitleOffset: 24,
+      labelFontSize: 13,
+      goldRadius: 8,
+      standardRadius: 4.5,
+      standardRelevantRadius: 6,
+      halfRadius: 5,
+      halfRelevantRadius: 6.5,
+      hoverRadius: 10,
+      hitRadius: 18,
+      selectionPadding: 5,
+      labelX: 11,
+      standardLabelY: -9,
+      halfLabelY: 16
+    };
+  }
+
+  if (
+    chartExpanded ||
+    compactViewport
+  ) {
+    return {
+      key: chartExpanded
+        ? "expanded-portrait"
+        : "mobile",
+      width: chartExpanded
+        ? 680
+        : 640,
+      height: chartExpanded
+        ? 820
+        : 720,
+      margin: {
+        top: 30,
+        right: 24,
+        bottom: 82,
+        left: 84
+      },
+      tickCount: 4,
+      tickFontSize: 22,
+      axisTitleFontSize: 24,
+      yAxisTitleOffset: 28,
+      labelFontSize: 19,
+      goldRadius: 10,
+      standardRadius: 5,
+      standardRelevantRadius: 7,
+      halfRadius: 5.5,
+      halfRelevantRadius: 7.5,
+      hoverRadius: 12,
+      hitRadius: 26,
+      selectionPadding: 5,
+      labelX: 13,
+      standardLabelY: -12,
+      halfLabelY: 18
+    };
+  }
+
+  return desktopLayout;
+}
+
+function chartItemKey(item) {
+  return [
+    item.ring,
+    item.cog,
+    item.isHalfLink
+      ? "half"
+      : "standard"
+  ].join(":");
+}
+
+function chartStatusToken(item) {
+  if (item.goldilocks) {
+    return "goldilocks";
+  }
+
+  if (item.dropoutMatch) {
+    return "fits-dropout";
+  }
+
+  if (item.gearMatch) {
+    return "gear-match";
+  }
+
+  return "outside";
+}
+
+function updateChartSelection(item) {
+  const selection =
+    $("chartSelection");
+
+  selectedChartKey =
+    chartItemKey(item);
+
+  $("chartSelectionSetup").textContent =
+    `${item.ring} × ${item.cog}`;
+
+  const status =
+    $("chartSelectionStatus");
+
+  status.textContent =
+    getStatus(item);
+
+  status.dataset.status =
+    chartStatusToken(item);
+
+  $("chartSelectionGear").textContent =
+    item.gearInches.toFixed(1);
+
+  $("chartSelectionChainstay").textContent =
+    formatChainstay(
+      item.requiredChainstayIn
+    );
+
+  $("chartSelectionShift").textContent =
+    formatShift(
+      item.axleShiftIn
+    );
+
+  $("chartSelectionChain").textContent =
+    formatChainLength(
+      item.chainLength
+    );
+
+  $("chartSelectionType").textContent =
+    item.isHalfLink
+      ? "Half-link"
+      : "Standard";
+
+  selection.hidden = false;
+}
+
+function clearChartSelection() {
+  selectedChartKey = null;
+  $("chartSelection").hidden = true;
+
+  d3.select("#chart")
+    .selectAll(
+      ".chart-point-group"
+    )
+    .classed(
+      "is-selected",
+      false
+    );
+}
+
+function selectChartItem(item) {
+  updateChartSelection(item);
+
+  d3.select("#chart")
+    .selectAll(
+      ".chart-point-group"
+    )
+    .classed(
+      "is-selected",
+      d => chartItemKey(d) ===
+        selectedChartKey
+    );
+}
+
 function renderSummary(data) {
   const sorted = [...data].sort(compareCombinations);
   const best = sorted[0];
@@ -671,13 +899,43 @@ function renderTable(data) {
   }).join("");
 }
 
-function renderChart(data) {
+function renderChart(
+  data,
+  options = {}
+) {
   const svg = d3.select("#chart");
   svg.selectAll("*").remove();
+
+  const layout =
+    getChartLayout(options);
+
+  lastChartLayoutKey =
+    layout.key;
+
+  svg
+    .attr(
+      "data-chart-layout",
+      layout.key
+    )
+    .style(
+      "--chart-tick-size",
+      `${layout.tickFontSize}px`
+    )
+    .style(
+      "--chart-axis-title-size",
+      `${layout.axisTitleFontSize}px`
+    )
+    .style(
+      "--chart-label-size",
+      `${layout.labelFontSize}px`
+    );
 
   if (!data.length) {
     activeChartZoom = null;
     activeChartSvg = null;
+    clearChartSelection();
+    $("halfLinkLegend").style.display =
+      "none";
     return;
   }
 
@@ -698,15 +956,11 @@ function renderChart(data) {
   const domainData =
     [...standardData, ...halfLinkData];
 
-  const width = 1100;
-  const height = 620;
-
-  const margin = {
-    top: 25,
-    right: 35,
-    bottom: 65,
-    left: 75
-  };
+  const {
+    width,
+    height,
+    margin
+  } = layout;
 
   const plotLeft = margin.left;
   const plotRight = width - margin.right;
@@ -718,7 +972,11 @@ function renderChart(data) {
   svg.attr(
     "viewBox",
     `0 0 ${width} ${height}`
-  );
+  )
+    .attr(
+      "preserveAspectRatio",
+      "xMidYMid meet"
+    );
 
   const measuredChainstayIn =
     uiChainstayToInches(
@@ -909,6 +1167,10 @@ function renderChart(data) {
 
   svg.append("text")
     .attr(
+      "class",
+      "chart-axis-title"
+    )
+    .attr(
       "x",
       (plotLeft + plotRight) / 2
     )
@@ -932,6 +1194,10 @@ function renderChart(data) {
 
   svg.append("text")
     .attr(
+      "class",
+      "chart-axis-title"
+    )
+    .attr(
       "transform",
       "rotate(-90)"
     )
@@ -941,7 +1207,7 @@ function renderChart(data) {
     )
     .attr(
       "y",
-      20
+      layout.yAxisTitleOffset
     )
     .attr(
       "text-anchor",
@@ -958,19 +1224,68 @@ function renderChart(data) {
   const tooltip =
     d3.select("#tooltip");
 
-  function attachTooltip(
+  function standardPointRadius(item) {
+    if (item.goldilocks) {
+      return layout.goldRadius;
+    }
+
+    return (
+      item.gearMatch ||
+      item.dropoutMatch
+    )
+      ? layout.standardRelevantRadius
+      : layout.standardRadius;
+  }
+
+  function halfLinkPointRadius(item) {
+    if (item.goldilocks) {
+      return layout.goldRadius;
+    }
+
+    return (
+      item.gearMatch ||
+      item.dropoutMatch
+    )
+      ? layout.halfRelevantRadius
+      : layout.halfRadius;
+  }
+
+  function attachPointInteractions(
     groups,
     restingRadius
   ) {
     groups
       .on(
+        "click",
+        function(event, item) {
+          event.stopPropagation();
+          selectChartItem(item);
+        }
+      );
+
+    const supportsHover =
+      window.matchMedia(
+        "(hover: hover) and (pointer: fine)"
+      ).matches;
+
+    if (!supportsHover) {
+      return;
+    }
+
+    groups
+      .on(
         "mouseenter",
         function(event, d) {
           d3.select(this)
-            .select("circle")
+            .select(
+              ".chart-point"
+            )
             .attr(
               "r",
-              d.goldilocks ? 8 : 7
+              Math.max(
+                layout.hoverRadius,
+                restingRadius(d) + 2
+              )
             );
 
           tooltip
@@ -1013,7 +1328,9 @@ function renderChart(data) {
         "mouseleave",
         function(event, d) {
           d3.select(this)
-            .select("circle")
+            .select(
+              ".chart-point"
+            )
             .attr(
               "r",
               restingRadius(d)
@@ -1038,13 +1355,21 @@ function renderChart(data) {
       )
       .selectAll("g")
       .data(standardData)
-      .join("g");
+      .join("g")
+      .attr(
+        "class",
+        "chart-point-group"
+      );
 
   standardGroups
     .append("circle")
     .attr(
+      "class",
+      "chart-point"
+    )
+    .attr(
       "r",
-      d => d.goldilocks ? 6 : 3.5
+      standardPointRadius
     )
     .attr(
       "fill",
@@ -1065,21 +1390,50 @@ function renderChart(data) {
     );
 
   standardGroups
+    .append("circle")
+    .attr(
+      "class",
+      "chart-selection-ring"
+    )
+    .attr(
+      "r",
+      d => standardPointRadius(d) +
+        layout.selectionPadding
+    );
+
+  standardGroups
     .filter(d => d.goldilocks)
     .append("text")
     .attr(
       "class",
       "combo-label"
     )
-    .attr("x", 8)
-    .attr("y", -7)
+    .attr(
+      "x",
+      layout.labelX
+    )
+    .attr(
+      "y",
+      layout.standardLabelY
+    )
     .text(
       d => `${d.ring}×${d.cog}`
     );
 
-  attachTooltip(
+  standardGroups
+    .append("circle")
+    .attr(
+      "class",
+      "chart-hit-target"
+    )
+    .attr(
+      "r",
+      layout.hitRadius
+    );
+
+  attachPointInteractions(
     standardGroups,
-    d => d.goldilocks ? 6 : 3.5
+    standardPointRadius
   );
 
   /*
@@ -1096,13 +1450,21 @@ function renderChart(data) {
         )
         .selectAll("g")
         .data(halfLinkData)
-        .join("g");
+        .join("g")
+        .attr(
+          "class",
+          "chart-point-group"
+        );
 
     halfGroups
       .append("circle")
       .attr(
+        "class",
+        "chart-point"
+      )
+      .attr(
         "r",
-        d => d.goldilocks ? 6 : 4.3
+        halfLinkPointRadius
       )
       .attr(
         "fill",
@@ -1131,21 +1493,50 @@ function renderChart(data) {
       );
 
     halfGroups
+      .append("circle")
+      .attr(
+        "class",
+        "chart-selection-ring"
+      )
+      .attr(
+        "r",
+        d => halfLinkPointRadius(d) +
+          layout.selectionPadding
+      );
+
+    halfGroups
       .filter(d => d.goldilocks)
       .append("text")
       .attr(
         "class",
         "combo-label half-link-label"
       )
-      .attr("x", 8)
-      .attr("y", 12)
+      .attr(
+        "x",
+        layout.labelX
+      )
+      .attr(
+        "y",
+        layout.halfLabelY
+      )
       .text(
         d => `${d.ring}×${d.cog} ½`
       );
 
-    attachTooltip(
+    halfGroups
+      .append("circle")
+      .attr(
+        "class",
+        "chart-hit-target"
+      )
+      .attr(
+        "r",
+        layout.hitRadius
+      );
+
+    attachPointInteractions(
       halfGroups,
-      d => d.goldilocks ? 6 : 4.3
+      halfLinkPointRadius
     );
   }
 
@@ -1168,27 +1559,35 @@ function renderChart(data) {
 
     xGrid.call(
       d3.axisBottom(zx)
-        .ticks(10)
+        .ticks(
+          layout.tickCount
+        )
         .tickSize(-plotHeight)
         .tickFormat("")
     );
 
     yGrid.call(
       d3.axisLeft(zy)
-        .ticks(10)
+        .ticks(
+          layout.tickCount
+        )
         .tickSize(-plotWidth)
         .tickFormat("")
     );
 
     xAxis.call(
       d3.axisBottom(zx)
-        .ticks(10)
+        .ticks(
+          layout.tickCount
+        )
         .tickFormat(xTickFormat)
     );
 
     yAxis.call(
       d3.axisLeft(zy)
-        .ticks(10)
+        .ticks(
+          layout.tickCount
+        )
     );
 
     dropoutBand
@@ -1385,10 +1784,110 @@ function renderChart(data) {
     chartZoomTransform
   );
 
+  if (selectedChartKey) {
+    const selectedItem =
+      (
+        showHalfLinks
+          ? domainData
+          : standardData
+      ).find(
+        item => chartItemKey(item) ===
+          selectedChartKey
+      );
+
+    if (selectedItem) {
+      updateChartSelection(
+        selectedItem
+      );
+
+      svg.selectAll(
+        ".chart-point-group"
+      )
+        .classed(
+          "is-selected",
+          item => chartItemKey(item) ===
+            selectedChartKey
+        );
+    } else {
+      clearChartSelection();
+    }
+  }
+
   $("halfLinkLegend").style.display =
     showHalfLinks
       ? "inline-flex"
       : "none";
+}
+
+function setChartExpanded(next) {
+  chartExpanded =
+    Boolean(next);
+
+  const chartPanel =
+    $("chartPanel");
+
+  chartPanel.classList.toggle(
+    "is-expanded",
+    chartExpanded
+  );
+
+  if (chartExpanded) {
+    chartPanel.scrollTop = 0;
+  }
+
+  document.body.classList.toggle(
+    "chart-expanded",
+    chartExpanded
+  );
+
+  $("expandChart").setAttribute(
+    "aria-expanded",
+    String(chartExpanded)
+  );
+
+  $("expandChartLabel").textContent =
+    chartExpanded
+      ? "Close graph"
+      : "Expand graph";
+
+  $("tooltip").style.display =
+    "none";
+
+  renderChart(
+    calculateCombinations()
+  );
+
+  window.requestAnimationFrame(
+    () => $("expandChart").focus({
+      preventScroll: true
+    })
+  );
+}
+
+let chartResizeTimer = null;
+
+function scheduleChartLayoutUpdate() {
+  window.clearTimeout(
+    chartResizeTimer
+  );
+
+  chartResizeTimer =
+    window.setTimeout(
+      () => {
+        const nextLayoutKey =
+          getChartLayout().key;
+
+        if (
+          nextLayoutKey !==
+          lastChartLayoutKey
+        ) {
+          renderChart(
+            calculateCombinations()
+          );
+        }
+      },
+      100
+    );
 }
 
 
@@ -1489,7 +1988,7 @@ function pdfKeyValue(doc, label, value, x, y, width = 84) {
   return y + 4 + lines.length * 4;
 }
 
-async function chartToPngDataUrl() {
+function serializeChartSvgForPdf() {
   const sourceSvg = $("chart");
 
   if (!sourceSvg || !sourceSvg.children.length) {
@@ -1523,8 +2022,11 @@ async function chartToPngDataUrl() {
     [
       "fill",
       "stroke",
+      "stroke-width",
       "color",
       "opacity",
+      "display",
+      "visibility",
       "font-family",
       "font-size",
       "font-weight"
@@ -1537,11 +2039,47 @@ async function chartToPngDataUrl() {
     });
   });
 
+  clone.querySelectorAll(
+    ".chart-hit-target"
+  ).forEach(
+    node => node.remove()
+  );
+
   const serializer =
     new XMLSerializer();
 
-  const svgText =
-    serializer.serializeToString(clone);
+  return serializer.serializeToString(
+    clone
+  );
+}
+
+async function chartToPngDataUrl() {
+  const allData =
+    calculateCombinations();
+
+  if (!allData.length) {
+    return null;
+  }
+
+  let svgText = null;
+
+  try {
+    renderChart(
+      allData,
+      { forceDesktop: true }
+    );
+
+    svgText =
+      serializeChartSvgForPdf();
+  } finally {
+    renderChart(
+      allData
+    );
+  }
+
+  if (!svgText) {
+    return null;
+  }
 
   const blob =
     new Blob(
@@ -2314,6 +2852,23 @@ $("zoomIn").addEventListener(
 $("zoomOut").addEventListener(
   "click",
   () => chartZoomBy(1 / 1.5)
+);
+
+$("expandChart").addEventListener(
+  "click",
+  () => setChartExpanded(
+    !chartExpanded
+  )
+);
+
+$("clearChartSelection").addEventListener(
+  "click",
+  clearChartSelection
+);
+
+window.addEventListener(
+  "resize",
+  scheduleChartLayoutUpdate
 );
 
 $("generatePdf").addEventListener(
