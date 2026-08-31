@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/KingBain/CogSmith/compare/v0.1.0...v0.1.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* deploy Pages only for published releases ([#14](https://github.com/KingBain/CogSmith/issues/14)) ([4bc2744](https://github.com/KingBain/CogSmith/commit/4bc274424b8f0f8055e6cb078cc6acb5adaab60d))
+
 ## [0.1.0](https://github.com/KingBain/CogSmith/compare/v0.0.1...v0.1.0) (2026-08-31)
 
 
