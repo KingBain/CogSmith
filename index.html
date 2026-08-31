@@ -165,8 +165,17 @@
     </div>
   </section>
 
-  <section class="panel">
-    <h2>Magic gear map</h2>
+  <section id="chartPanel" class="panel chart-panel">
+    <div class="chart-heading">
+      <h2>Magic gear map</h2>
+      <button id="expandChart" class="chart-expand-button" type="button"
+        aria-controls="chartPanel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path>
+        </svg>
+        <span id="expandChartLabel">Expand graph</span>
+      </button>
+    </div>
     <div class="legend">
       <span><i class="swatch gear"></i>Target gear-inch range</span>
       <span><i class="swatch dropout"></i>Dropout adjustment range</span>
@@ -175,7 +184,10 @@
     </div>
 
     <div class="chart-toolbar">
-      <div class="zoom-hint">Scroll or pinch to zoom · drag to pan</div>
+      <div class="zoom-hint">
+        <span class="desktop-chart-hint">Scroll or pinch to zoom · drag to pan</span>
+        <span class="mobile-chart-hint">Pinch to zoom · drag to pan · tap a point for details</span>
+      </div>
       <div class="zoom-controls" aria-label="Chart zoom controls">
         <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
         <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
@@ -187,6 +199,42 @@
       <svg id="chart" role="img" aria-label="Single-speed gearing chart"></svg>
       <div id="tooltip" class="tooltip"></div>
     </div>
+
+    <aside id="chartSelection" class="chart-selection" aria-live="polite" hidden>
+      <div class="chart-selection-heading">
+        <div>
+          <span class="chart-selection-eyebrow">Selected setup</span>
+          <strong id="chartSelectionSetup">—</strong>
+        </div>
+        <button id="clearChartSelection" class="chart-selection-clear" type="button">Clear</button>
+      </div>
+      <dl class="chart-selection-grid">
+        <div>
+          <dt>Status</dt>
+          <dd id="chartSelectionStatus">—</dd>
+        </div>
+        <div>
+          <dt>Gear inches</dt>
+          <dd id="chartSelectionGear">—</dd>
+        </div>
+        <div>
+          <dt>Chainstay</dt>
+          <dd id="chartSelectionChainstay">—</dd>
+        </div>
+        <div>
+          <dt>Axle shift</dt>
+          <dd id="chartSelectionShift">—</dd>
+        </div>
+        <div>
+          <dt>Chain</dt>
+          <dd id="chartSelectionChain">—</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd id="chartSelectionType">—</dd>
+        </div>
+      </dl>
+    </aside>
   </section>
 
   <section class="panel">

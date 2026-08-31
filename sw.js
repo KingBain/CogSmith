@@ -1,4 +1,4 @@
-const CACHE_NAME = "cogsmith-v2";
+const CACHE_NAME = "cogsmith-v3";
 
 const APP_SHELL = [
   "./",
